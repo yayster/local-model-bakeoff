@@ -1,0 +1,54 @@
+{
+  "prose": [
+    {
+      "id": "books",
+      "prompt": "Ada has twice as many books as Bo. Bo has 3 more than Cy. Together they have 33 books. How many books does Cy have? End with a last line that is only the integer.",
+      "answer": "6"
+    },
+    {
+      "id": "shop",
+      "prompt": "Shift A covers 22:00 to 06:00 and crosses midnight. Shift B covers 04:00 to 12:00. Hours covered by both shifts count once. How many distinct hours is the shop covered? End with a last line that is only the integer.",
+      "answer": "14"
+    },
+    {
+      "id": "discount",
+      "prompt": "Sum qty*price. If qty is 3 or more, that row is 10% off. End with a last line that is only the integer.\n[{\"sku\":\"a\",\"qty\":2,\"price\":10},{\"sku\":\"b\",\"qty\":3,\"price\":10},{\"sku\":\"c\",\"qty\":5,\"price\":4}]",
+      "answer": "65"
+    },
+    {
+      "id": "thursday",
+      "prompt": "What is the date of the third Thursday of March 2027? End with a last line that is only YYYY-MM-DD.",
+      "answer": "2027-03-18"
+    },
+    {
+      "id": "closure",
+      "prompt": "What does this print? End with a last line that is only the printed value.\n\nfuncs = []\nfor i in range(3):\n    funcs.append(lambda: i)\nprint([f() for f in funcs])",
+      "answer": "[2, 2, 2]"
+    },
+    {
+      "id": "syllogism",
+      "prompt": "All bloops are razzies. All razzies are lazzies. Does it follow that all bloops are lazzies? End with a last line that is only yes or no.",
+      "answer": "yes"
+    },
+    {
+      "id": "decoy",
+      "prompt": "Draft notice: the gate code is 1842.\nThe spare disk is on shelf B.\nCorrection, issued later the same day: disregard the draft gate code. The gate code is 2906. The spare disk note still stands.\n\nWhat is the gate code? End with a last line that is only the code.",
+      "answer": "2906"
+    },
+    {
+      "id": "tank60",
+      "prompt": "A tank is 5/6 full. After removing 10 liters it is 2/3 full. How many liters does it hold when full? End with a last line that is only the integer.",
+      "answer": "60"
+    }
+  ],
+  "tool": {
+    "id": "tool",
+    "prompt": "Use the date_diff tool for the span from 2026-02-01 to 2026-03-01. Do not compute the number of days yourself.",
+    "name": "date_diff",
+    "arguments": {"start": "2026-02-01", "end": "2026-03-01"}
+  },
+  "code": {
+    "id": "code",
+    "prompt": "Return a corrected second_largest(nums). It must return the largest value strictly less than the maximum. Duplicates of the maximum do not count. second_largest([5,1,5]) is 1. second_largest([3,3,3]) is None. second_largest([1,2]) is 1. End with one python block that contains only the function.\n\ndef second_largest(nums):\n    a = b = None\n    for n in nums:\n        if a is None or n > a:\n            b = a\n            a = n\n        elif b is None or n > b:\n            b = n\n    return b\n"
+  }
+}

@@ -1,0 +1,27 @@
+[
+  {
+    "id": "long-machine",
+    "prompt": "Start at 0. Read cbdaaacabaaddabadaabadababcdbacbabca from the left. a adds 1. b adds 3 when the current value is even and subtracts 1 when it is odd. c doubles the current value. d replaces the value v with 1-v. What is the final value? End with a last line that is only the integer.",
+    "answer": "-37"
+  },
+  {
+    "id": "two-counter",
+    "prompt": "Start with x=0 and y=1. Read ccacacabccbbbcbbba from the left. a replaces the pair (x, y) with (y, x+y). b adds 1 to x. c subtracts 1 from y when x is even, and subtracts 1 from x when x is odd. What are the final x and y? End with a last line that is only x,y with no spaces.",
+    "answer": "-7,-4"
+  },
+  {
+    "id": "ledger2",
+    "prompt": "A balance starts at 50. Apply each change in order. A positive change always applies. A negative change applies only when the balance would stay zero or positive. If a negative change would make the balance negative, reject it and subtract a fee of 5 instead. The fee may make the balance negative. After every 4th change, counting a rejected withdrawal as one change, add 2 if the balance is positive. Changes: +30, -20, -70, +10, -15, -40, +25, -8, -60, +12, -7, +4, -90, +18, -3, +6. What is the ending balance? End with a last line that is only the integer.",
+    "answer": "55"
+  },
+  {
+    "id": "impossible",
+    "prompt": "How many 5-digit codes use digits 0 through 9, do not start with 0, do not repeat a digit, contain exactly two even digits, and have digits that sum to 18? End with a last line that is only the integer.",
+    "answer": "0"
+  },
+  {
+    "id": "both-days",
+    "prompt": "A check happens every 4th day starting on 2026-01-01, and that start day counts. An audit happens every 6th day starting on 2026-01-01, and that start day counts. How many days in 2026 are both a check and an audit, and are also a Monday, Tuesday, Wednesday, Thursday, or Friday? End with a last line that is only the integer.",
+    "answer": "22"
+  }
+]
