@@ -10,6 +10,7 @@ that talk to Ollama's `/api/chat`. It replaces the eight-repair ladder in
 python3 ladder/run.py --check                                   # validate the ladder, no model
 python3 ladder/run.py http://zerotwo:11434 ornith-1.5:9b         # full climb, ~15 minutes for a 9B
 python3 ladder/run.py http://zerotwo:11434 ornith-1.5:9b --rungs 9,10,11 --repeats 3
+python3 ladder/sweep.py http://abzu:11434 qwen3.8:27b flint:40b  # several models, one at a time, unloaded between
 python3 ladder/report.py                                        # table of every result file
 python3 bakeoff.py http://zerotwo:11434 ornith-1.5:9b --sections ladder2
 ```
