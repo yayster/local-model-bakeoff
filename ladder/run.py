@@ -29,7 +29,7 @@ import harness  # noqa: E402
 import rungs as rung_defs  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
-LADDER_VERSION = "2026-10-26b"
+LADDER_VERSION = "2026-10-26c"
 SCHEMA = 2
 
 SYSTEM = (
@@ -269,9 +269,20 @@ def run_rung(client, rung: dict, total: int, max_turns: int | None, transcript_d
                 assistant["tool_calls"] = calls
             messages.append(assistant)
             turn = {"n": n, **meta, "tools": [], "content": (msg.get("content") or "")[:300]}
+            if not calls and meta.get("done_reason") == "length":
+                # The reply hit the generation cap before any tool call. That is not a
+                # decision to stop, so it costs a turn and a nudge, like a malformed call.
+                ws.events["length_stops"] = ws.events.get("length_stops", 0) + 1
+                turn["length_stop"] = True
+                turns.append(turn)
+                messages.append({"role": "user", "content": (
+                    "Your reply hit the length cap before any tool call, so nothing happened. "
+                    "Keep prose short and make the tool call now.")})
+                print(f"  turn {n} length cap, no tool call, nudged {meta['wall']}s", flush=True)
+                continue
             if not calls:
                 turns.append(turn)
-                stop_reason = "stop" if meta.get("done_reason") != "length" else "length"
+                stop_reason = "stop"
                 print(f"  turn {n} stop {meta['wall']}s", flush=True)
                 break
             for call in calls:
@@ -319,6 +330,7 @@ def run_rung(client, rung: dict, total: int, max_turns: int | None, transcript_d
             "test_write_attempts": ev["test_write_attempts"],
             "bad_tool_calls": ev["bad_tool_calls"],
             "malformed_tool_calls": ev.get("malformed_tool_calls", 0),
+            "length_stops": ev.get("length_stops", 0),
             "no_tool_calls": all(not t.get("tools") for t in turns),
             "stopped_red": stop_reason == "stop" and not scored["public"]["ok"] and rung["gold_passes_public"],
             "ran_out_of_turns": stop_reason == "turns",
@@ -370,7 +382,7 @@ def score(rows: list[dict]) -> dict:
         "prompt_tokens": sum(r["prompt_tokens"] for r in rows),
         "seconds": round(sum(r["seconds"] for r in rows), 1),
         "errors": sum(1 for r in rows if r["error"]),
-        "length_stops": sum(1 for r in rows if r["stop_reason"] == "length"),
+        "length_stops": sum(r["flags"].get("length_stops", 0) for r in rows),
         "stopped_red": sum(1 for r in rows if r["flags"]["stopped_red"]),
         "test_write_attempts": sum(r["flags"]["test_write_attempts"] for r in rows),
         "ran_out_of_turns": sum(1 for r in rows if r["flags"]["ran_out_of_turns"]),

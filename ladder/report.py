@@ -43,7 +43,7 @@ def rung_cell(rows: list[dict]) -> str:
     extra = []
     if any(r.get("error") for r in rows):
         extra.append("err")
-    if any(r.get("stop_reason") == "length" for r in rows):
+    if any(r.get("stop_reason") == "length" or r["flags"].get("length_stops") for r in rows):
         extra.append("length")
     if any(r["flags"].get("ran_out_of_turns") for r in rows):
         extra.append("turns")
