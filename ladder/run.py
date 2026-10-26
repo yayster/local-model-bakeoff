@@ -29,7 +29,7 @@ import harness  # noqa: E402
 import rungs as rung_defs  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
-LADDER_VERSION = "2026-10-26"
+LADDER_VERSION = "2026-10-26b"
 SCHEMA = 2
 
 SYSTEM = (

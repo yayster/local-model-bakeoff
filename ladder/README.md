@@ -1,6 +1,6 @@
 # Ladder v2
 
-Thirteen agentic repair rungs, each harder than the last, for ranking local models
+Sixteen agentic repair rungs, each harder than the last, for ranking local models
 that talk to Ollama's `/api/chat`. It replaces the eight-repair ladder in
 `repair/loop2.py` with something that separates the models the old ladder could not.
 
@@ -8,8 +8,8 @@ that talk to Ollama's `/api/chat`. It replaces the eight-repair ladder in
 
 ```bash
 python3 ladder/run.py --check                                   # validate the ladder, no model
-python3 ladder/run.py http://zerotwo:11434 ornith-1.5:9b         # full climb, ~15 minutes for a 9B
-python3 ladder/run.py http://zerotwo:11434 ornith-1.5:9b --rungs 9,10,11 --repeats 3
+python3 ladder/run.py http://zerotwo:11434 ornith-1.5:9b         # full climb, 3 minutes for a 27B, 20 for a 9B
+python3 ladder/run.py http://zerotwo:11434 ornith-1.5:9b --repeats 3   # the protocol for a ranking
 python3 ladder/sweep.py http://abzu:11434 qwen3.8:27b flint:40b  # several models, one at a time, unloaded between
 python3 ladder/report.py                                        # table of every result file
 python3 bakeoff.py http://zerotwo:11434 ornith-1.5:9b --sections ladder2
@@ -32,7 +32,7 @@ refused and counted. The hidden tests never enter the working directory; grading
 copies the final sources into a fresh directory.
 
 Each rung has a turn budget (8 for the first four, 10 for the middle five, 12 for the
-top four). A turn may hold several tool calls. The model stops a rung by replying with no
+top seven). A turn may hold several tool calls. The model stops a rung by replying with no
 tool call.
 
 ## The rungs
@@ -50,13 +50,17 @@ tool call.
 | 9 | shlex | tokenizer state machine | green | single quotes, escapes, empty words, a kept trailing backslash that the stdlib rejects |
 | 10 | jsonptr | standard compliance | green | `~1` before `~0`, root pointer, KeyError everywhere, `-` append |
 | 11 | cron | two files, dense spec, two bugs | green | step from range start, 7 is Sunday, dom/dow OR rule |
-| 12 | ranges | non-functional requirement | green | a 100k by 100k case with a 12 s timeout |
-| 13 | allocate | spec above a wrong public test | red, and stays red on the gold | largest remainder with ties to the earlier index |
+| 12 | expr | recursive descent, precedence rules | green | unary minus below `**`, right-grouping `**`, trailing junk, zero division |
+| 13 | undo | nested state, history semantics | green | a group is one step, outermost group only, new edit discards redo, open group blocks undo |
+| 14 | reconcile | two files, greedy matching with tie-breaks | green | inclusive 3-day window in rules.py, closest date wins, refs only when both present |
+| 15 | ranges | non-functional requirement | green | a 100k by 100k case with a 12 s timeout |
+| 16 | allocate | spec above a wrong public test | red, and stays red on the gold | largest remainder with ties to the earlier index |
 
 Rung 1 is the smoke test: the public test is red, so a model that cannot drive the
 tools at all scores zero here and the rest of the ladder is not blamed on the task.
-Rung 12 asks the model to act on a sentence about speed while every test is green.
-Rung 13 tells the model that one public assertion is wrong and the spec wins, then
+Rungs 12 to 14 were added after a first sweep in which three models of 27B to 40B tied
+at 11 of 13; they are the ceiling. Rung 15 asks the model to act on a sentence about
+speed while every test is green. Rung 16 tells the model that one public assertion is wrong and the spec wins, then
 checks whether it bends the code toward the test anyway.
 
 ## Scoring
@@ -66,11 +70,12 @@ checks whether it bends the code toward the test anyway.
 - **Height**: the highest rung such that every rung below it also passed. It says how far
   the climb was clean. It is harsh by design: on the first live climb a 9B model passed
   11 of 13 rungs with height 3, because it skipped the sort on rung 4 and then cleared
-  everything up to and including the authority rung.
+  everything up to and including the authority rung. Across repeats it swings by several
+  rungs at temperature 0, so read it with the min and max that `--repeats` reports.
 - **Peak**: the highest single rung passed.
-- **Gain**: hidden cases passed above the floor. Eighteen of the fifty-seven hidden cases
-  already pass on the untouched bug; gain is the share of the remaining thirty-nine
-  that the model won. It is the partial-credit number.
+- **Gain**: hidden cases passed above the floor. Twenty-three of the seventy-three
+  hidden cases already pass on the untouched bug; gain is the share of the remaining
+  fifty that the model won. It is the partial-credit number.
 - **Efficiency**: median turns on passed rungs, total generated tokens, wall minutes.
 - **Behaviour flags** per rung: read the spec, ran tests, used `run_python`, tried to
   write a test, stopped while the public tests were red, ran out of turns, bad tool
@@ -78,7 +83,8 @@ checks whether it bends the code toward the test anyway.
 
 `--repeats N` climbs the ladder N times and reports the median of each number plus the
 minimum and maximum height. Temperature 0 is not deterministic across batches on every
-backend, so a one-rung spread is normal.
+backend, and a 9B flipped three low rungs between two climbs, so three repeats is the
+protocol for a ranking.
 
 ## Why trust it
 
@@ -90,13 +96,13 @@ backend, so a one-rung spread is normal.
 - every example sentence in the spec evaluates to the stated value on the gold;
 - every **trap** fails the hidden tests. A trap is a plausible wrong fix: strict instead
   of inclusive comparison, a fix that ignores one sentence of the spec, a tie broken
-  the other way, or `shlex.split` itself. There are at least two per rung, thirty-one in
-  all, and `--check`
+  the other way, or `shlex.split` itself. There are at least two per rung, forty in all,
+  and `--check`
   prints which hidden case catches each.
 
 `--mock gold|lazy|trap|cheat|loop` drives the whole loop with a scripted model so the
 harness, tool dispatch, grading, flags, and report can be exercised without a GPU.
-Gold must reach height 13, lazy and loop must reach 0, trap must earn partial gain and
+Gold must reach height 16, lazy and loop must reach 0, trap must earn partial gain and
 no passes, and cheat must light the test-write flag on every rung.
 
 Every result file carries a hash of the specs, bugs, tests, and turn budgets. Two

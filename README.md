@@ -31,7 +31,7 @@ python3 ladder/run.py --check
 | `ceiling` | Five long traces from `tasks/ceiling.json` | Last line, 5 items. A length stop is retried once at 6000 tokens |
 | `repair` | Eight Python repairs. The model gets `read_file`, `write_file`, and `run_tests`. Five turns | Hidden tests |
 | `ladder` | Eight harder repairs. Six turns. Public tests already pass on the bug | Hidden tests |
-| `ladder2` | Thirteen rungs of rising difficulty, five tools, traps and a self-check. See `ladder/README.md` | Height, gain, flags |
+| `ladder2` | Sixteen rungs of rising difficulty, five tools, traps and a self-check. See `ladder/README.md` | Height, gain, flags |
 
 Settings match the bake-off: `think` false, temperature 0. The request does not set `num_ctx`, so the server's context window is the seat. The published run used 131072.
 

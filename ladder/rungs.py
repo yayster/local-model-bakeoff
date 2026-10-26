@@ -1,4 +1,4 @@
-"""The thirteen rungs of ladder v2.
+"""The sixteen rungs of ladder v2.
 
 Each rung is a small Python project with a bug, a gold fix, public tests the
 model can run, hidden tests that score it, a structured list of examples that
@@ -1786,7 +1786,1296 @@ rung(
 
 # -------------------------------------------------------------------------- 12
 rung(
-    "ranges", 12, "Range counting at scale", "non-functional requirement, green tests",
+    "expr", 12, "Expression evaluator", "recursive descent, precedence rules",
+    """
+    evaluate(text) computes an arithmetic expression and returns its value. Numbers
+    follow Python: an integer literal is an int, a literal with a decimal point is a
+    float, / is true division and always gives a float, and ** of two ints with a
+    negative exponent gives a float. Operators are binary + - * / and **, unary minus,
+    and parentheses. Precedence from lowest to highest is + and -, then * and /, then
+    unary minus, then **, so -2**2 is -4 while 2*-3 is -6. ** groups to the right, so
+    2**3**2 is 512, and the exponent may itself carry a unary minus. Whitespace between
+    tokens is ignored. Division by zero, an empty expression, unbalanced parentheses,
+    a missing operand, or any other character raises ValueError.
+    """,
+    [
+        {"call": "evaluate('1 + 2 * 3')", "expect": "7"},
+        {"call": "evaluate('-2**2')", "expect": "-4"},
+        {"call": "evaluate('2**3**2')", "expect": "512"},
+        {"call": "evaluate('(1+2)*(3+4)')", "expect": "21"},
+        {"call": "evaluate('10/4')", "expect": "2.5"},
+        {"call": "evaluate('3 - -2')", "expect": "5"},
+        {"call": "evaluate('2**-1')", "expect": "0.5"},
+        {"call": "evaluate('1/0')", "raises": "ValueError"},
+        {"call": "evaluate('2 +')", "raises": "ValueError"},
+        {"call": "evaluate('7 % 3')", "raises": "ValueError"},
+    ],
+    {"mod.py": """
+        def _tokens(text):
+            out, i, n = [], 0, len(text)
+            while i < n:
+                ch = text[i]
+                if ch.isspace():
+                    i += 1
+                elif ch.isdigit() or ch == '.':
+                    j = i
+                    while j < n and (text[j].isdigit() or text[j] == '.'):
+                        j += 1
+                    num = text[i:j]
+                    out.append(float(num) if '.' in num else int(num))
+                    i = j
+                elif text.startswith('**', i):
+                    out.append('**')
+                    i += 2
+                elif ch in '+-*/()':
+                    out.append(ch)
+                    i += 1
+                else:
+                    raise ValueError(f'bad character {ch!r}')
+            return out
+
+
+        class _Parser:
+            def __init__(self, tokens):
+                self.tokens = tokens
+                self.i = 0
+
+            def peek(self):
+                return self.tokens[self.i] if self.i < len(self.tokens) else None
+
+            def take(self):
+                tok = self.peek()
+                self.i += 1
+                return tok
+
+            def expr(self):
+                value = self.term()
+                while self.peek() in ('+', '-'):
+                    op = self.take()
+                    right = self.term()
+                    value = value + right if op == '+' else value - right
+                return value
+
+            def term(self):
+                value = self.power()
+                while self.peek() in ('*', '/'):
+                    op = self.take()
+                    right = self.power()
+                    value = value * right if op == '*' else value / right
+                return value
+
+            def power(self):
+                value = self.atom()
+                while self.peek() == '**':
+                    self.take()
+                    value = value ** self.atom()
+                return value
+
+            def atom(self):
+                tok = self.take()
+                if tok == '-':
+                    return -self.atom()
+                if tok == '(':
+                    value = self.expr()
+                    if self.take() != ')':
+                        raise ValueError('expected )')
+                    return value
+                if isinstance(tok, (int, float)):
+                    return tok
+                raise ValueError('expected a number')
+
+
+        def evaluate(text):
+            return _Parser(_tokens(text)).expr()
+    """},
+    {"mod.py": """
+        def _tokens(text):
+            out, i, n = [], 0, len(text)
+            while i < n:
+                ch = text[i]
+                if ch.isspace():
+                    i += 1
+                elif ch.isdigit() or ch == '.':
+                    j = i
+                    while j < n and (text[j].isdigit() or text[j] == '.'):
+                        j += 1
+                    num = text[i:j]
+                    try:
+                        out.append(float(num) if '.' in num else int(num))
+                    except ValueError:
+                        raise ValueError(f'bad number {num!r}')
+                    i = j
+                elif text.startswith('**', i):
+                    out.append('**')
+                    i += 2
+                elif ch in '+-*/()':
+                    out.append(ch)
+                    i += 1
+                else:
+                    raise ValueError(f'bad character {ch!r}')
+            return out
+
+
+        class _Parser:
+            def __init__(self, tokens):
+                self.tokens = tokens
+                self.i = 0
+
+            def peek(self):
+                return self.tokens[self.i] if self.i < len(self.tokens) else None
+
+            def take(self):
+                tok = self.peek()
+                self.i += 1
+                return tok
+
+            def expr(self):
+                value = self.term()
+                while self.peek() in ('+', '-'):
+                    op = self.take()
+                    right = self.term()
+                    value = value + right if op == '+' else value - right
+                return value
+
+            def term(self):
+                value = self.factor()
+                while self.peek() in ('*', '/'):
+                    op = self.take()
+                    right = self.factor()
+                    if op == '*':
+                        value = value * right
+                    else:
+                        if right == 0:
+                            raise ValueError('division by zero')
+                        value = value / right
+                return value
+
+            def factor(self):
+                if self.peek() == '-':
+                    self.take()
+                    return -self.factor()
+                return self.power()
+
+            def power(self):
+                value = self.atom()
+                if self.peek() == '**':
+                    self.take()
+                    exponent = self.factor()
+                    try:
+                        return value ** exponent
+                    except ZeroDivisionError:
+                        raise ValueError('division by zero')
+                return value
+
+            def atom(self):
+                tok = self.take()
+                if tok == '(':
+                    value = self.expr()
+                    if self.take() != ')':
+                        raise ValueError('expected )')
+                    return value
+                if isinstance(tok, (int, float)) and not isinstance(tok, bool):
+                    return tok
+                raise ValueError('expected a number')
+
+
+        def evaluate(text):
+            parser = _Parser(_tokens(text))
+            if not parser.tokens:
+                raise ValueError('empty expression')
+            value = parser.expr()
+            if parser.peek() is not None:
+                raise ValueError('unexpected token')
+            return value
+    """},
+    tests("""
+    from mod import evaluate
+    class T(unittest.TestCase):
+        def test_basic(self):
+            self.assertEqual(evaluate('1 + 2 * 3'), 7)
+            self.assertEqual(evaluate('(1+2)*(3+4)'), 21)
+            self.assertEqual(evaluate('10/4'), 2.5)
+    """),
+    tests("""
+    from mod import evaluate
+    class T(unittest.TestCase):
+        def test_unary_minus_below_power(self):
+            self.assertEqual(evaluate('-2**2'), -4)
+            self.assertEqual(evaluate('(-2)**2'), 4)
+            self.assertEqual(evaluate('2**-1'), 0.5)
+            self.assertEqual(evaluate('-(-3)'), 3)
+        def test_power_groups_right(self):
+            self.assertEqual(evaluate('2**3**2'), 512)
+            self.assertEqual(evaluate('(2**3)**2'), 64)
+        def test_errors(self):
+            for bad in ('1/0', '2 +', '(1', '1)', '7 % 3', '', '   ', '2 3', '0**-1', '1..2'):
+                with self.assertRaises(ValueError, msg=bad):
+                    evaluate(bad)
+        def test_types(self):
+            self.assertIsInstance(evaluate('2*3'), int)
+            self.assertEqual(evaluate('2*3'), 6)
+            self.assertIsInstance(evaluate('2.0*3'), float)
+            self.assertIsInstance(evaluate('6/3'), float)
+            self.assertEqual(evaluate('6/3'), 2.0)
+        def test_spacing_and_mixing(self):
+            self.assertEqual(evaluate(' 3 - -2 '), 5)
+            self.assertEqual(evaluate('2*-3'), -6)
+            self.assertEqual(evaluate('1 - 2 - 3'), -4)
+            self.assertEqual(evaluate('8 / 2 / 2'), 2.0)
+            self.assertEqual(evaluate('2 + 3 * 4 ** 2 / 8'), 8.0)
+    """),
+    {
+        "power_left": {"mod.py": """
+            def _tokens(text):
+                out, i, n = [], 0, len(text)
+                while i < n:
+                    ch = text[i]
+                    if ch.isspace():
+                        i += 1
+                    elif ch.isdigit() or ch == '.':
+                        j = i
+                        while j < n and (text[j].isdigit() or text[j] == '.'):
+                            j += 1
+                        num = text[i:j]
+                        try:
+                            out.append(float(num) if '.' in num else int(num))
+                        except ValueError:
+                            raise ValueError(num)
+                        i = j
+                    elif text.startswith('**', i):
+                        out.append('**')
+                        i += 2
+                    elif ch in '+-*/()':
+                        out.append(ch)
+                        i += 1
+                    else:
+                        raise ValueError(ch)
+                return out
+
+
+            class _Parser:
+                def __init__(self, tokens):
+                    self.tokens = tokens
+                    self.i = 0
+
+                def peek(self):
+                    return self.tokens[self.i] if self.i < len(self.tokens) else None
+
+                def take(self):
+                    tok = self.peek()
+                    self.i += 1
+                    return tok
+
+                def expr(self):
+                    value = self.term()
+                    while self.peek() in ('+', '-'):
+                        op = self.take()
+                        right = self.term()
+                        value = value + right if op == '+' else value - right
+                    return value
+
+                def term(self):
+                    value = self.factor()
+                    while self.peek() in ('*', '/'):
+                        op = self.take()
+                        right = self.factor()
+                        if op == '*':
+                            value = value * right
+                        else:
+                            if right == 0:
+                                raise ValueError('division by zero')
+                            value = value / right
+                    return value
+
+                def factor(self):
+                    if self.peek() == '-':
+                        self.take()
+                        return -self.factor()
+                    return self.power()
+
+                def power(self):
+                    value = self.atom()
+                    while self.peek() == '**':
+                        self.take()
+                        negate = False
+                        if self.peek() == '-':
+                            self.take()
+                            negate = True
+                        exponent = self.atom()
+                        if negate:
+                            exponent = -exponent
+                        try:
+                            value = value ** exponent
+                        except ZeroDivisionError:
+                            raise ValueError('division by zero')
+                    return value
+
+                def atom(self):
+                    tok = self.take()
+                    if tok == '(':
+                        value = self.expr()
+                        if self.take() != ')':
+                            raise ValueError('expected )')
+                        return value
+                    if isinstance(tok, (int, float)):
+                        return tok
+                    raise ValueError('expected a number')
+
+
+            def evaluate(text):
+                parser = _Parser(_tokens(text))
+                if not parser.tokens:
+                    raise ValueError('empty')
+                value = parser.expr()
+                if parser.peek() is not None:
+                    raise ValueError('trailing')
+                return value
+        """},
+        "unary_tight": {"mod.py": """
+            def _tokens(text):
+                out, i, n = [], 0, len(text)
+                while i < n:
+                    ch = text[i]
+                    if ch.isspace():
+                        i += 1
+                    elif ch.isdigit() or ch == '.':
+                        j = i
+                        while j < n and (text[j].isdigit() or text[j] == '.'):
+                            j += 1
+                        num = text[i:j]
+                        try:
+                            out.append(float(num) if '.' in num else int(num))
+                        except ValueError:
+                            raise ValueError(num)
+                        i = j
+                    elif text.startswith('**', i):
+                        out.append('**')
+                        i += 2
+                    elif ch in '+-*/()':
+                        out.append(ch)
+                        i += 1
+                    else:
+                        raise ValueError(ch)
+                return out
+
+
+            class _Parser:
+                def __init__(self, tokens):
+                    self.tokens = tokens
+                    self.i = 0
+
+                def peek(self):
+                    return self.tokens[self.i] if self.i < len(self.tokens) else None
+
+                def take(self):
+                    tok = self.peek()
+                    self.i += 1
+                    return tok
+
+                def expr(self):
+                    value = self.term()
+                    while self.peek() in ('+', '-'):
+                        op = self.take()
+                        right = self.term()
+                        value = value + right if op == '+' else value - right
+                    return value
+
+                def term(self):
+                    value = self.power()
+                    while self.peek() in ('*', '/'):
+                        op = self.take()
+                        right = self.power()
+                        if op == '*':
+                            value = value * right
+                        else:
+                            if right == 0:
+                                raise ValueError('division by zero')
+                            value = value / right
+                    return value
+
+                def power(self):
+                    value = self.atom()
+                    if self.peek() == '**':
+                        self.take()
+                        exponent = self.power()
+                        try:
+                            return value ** exponent
+                        except ZeroDivisionError:
+                            raise ValueError('division by zero')
+                    return value
+
+                def atom(self):
+                    tok = self.take()
+                    if tok == '-':
+                        return -self.atom()
+                    if tok == '(':
+                        value = self.expr()
+                        if self.take() != ')':
+                            raise ValueError('expected )')
+                        return value
+                    if isinstance(tok, (int, float)):
+                        return tok
+                    raise ValueError('expected a number')
+
+
+            def evaluate(text):
+                parser = _Parser(_tokens(text))
+                if not parser.tokens:
+                    raise ValueError('empty')
+                value = parser.expr()
+                if parser.peek() is not None:
+                    raise ValueError('trailing')
+                return value
+        """},
+        "no_end_check": {"mod.py": """
+            def _tokens(text):
+                out, i, n = [], 0, len(text)
+                while i < n:
+                    ch = text[i]
+                    if ch.isspace():
+                        i += 1
+                    elif ch.isdigit() or ch == '.':
+                        j = i
+                        while j < n and (text[j].isdigit() or text[j] == '.'):
+                            j += 1
+                        num = text[i:j]
+                        try:
+                            out.append(float(num) if '.' in num else int(num))
+                        except ValueError:
+                            raise ValueError(num)
+                        i = j
+                    elif text.startswith('**', i):
+                        out.append('**')
+                        i += 2
+                    elif ch in '+-*/()':
+                        out.append(ch)
+                        i += 1
+                    else:
+                        raise ValueError(ch)
+                return out
+
+
+            class _Parser:
+                def __init__(self, tokens):
+                    self.tokens = tokens
+                    self.i = 0
+
+                def peek(self):
+                    return self.tokens[self.i] if self.i < len(self.tokens) else None
+
+                def take(self):
+                    tok = self.peek()
+                    self.i += 1
+                    return tok
+
+                def expr(self):
+                    value = self.term()
+                    while self.peek() in ('+', '-'):
+                        op = self.take()
+                        right = self.term()
+                        value = value + right if op == '+' else value - right
+                    return value
+
+                def term(self):
+                    value = self.factor()
+                    while self.peek() in ('*', '/'):
+                        op = self.take()
+                        right = self.factor()
+                        if op == '*':
+                            value = value * right
+                        else:
+                            if right == 0:
+                                raise ValueError('division by zero')
+                            value = value / right
+                    return value
+
+                def factor(self):
+                    if self.peek() == '-':
+                        self.take()
+                        return -self.factor()
+                    return self.power()
+
+                def power(self):
+                    value = self.atom()
+                    if self.peek() == '**':
+                        self.take()
+                        exponent = self.factor()
+                        try:
+                            return value ** exponent
+                        except ZeroDivisionError:
+                            raise ValueError('division by zero')
+                    return value
+
+                def atom(self):
+                    tok = self.take()
+                    if tok == '(':
+                        value = self.expr()
+                        if self.take() != ')':
+                            raise ValueError('expected )')
+                        return value
+                    if isinstance(tok, (int, float)):
+                        return tok
+                    raise ValueError('expected a number')
+
+
+            def evaluate(text):
+                parser = _Parser(_tokens(text))
+                if not parser.tokens:
+                    raise ValueError('empty')
+                return parser.expr()
+        """},
+    },
+    max_turns=12,
+)
+
+# -------------------------------------------------------------------------- 13
+rung(
+    "undo", 13, "Grouped undo", "nested state, history semantics",
+    """
+    Doc() is a text document that starts empty. insert(pos, s) inserts s at index pos,
+    where pos may equal the current length. delete(pos, n) removes the n characters
+    starting at pos. text() returns the content. Positions outside the text raise
+    IndexError and change nothing. undo() reverses the most recent step that is not
+    already undone; redo() re-applies the most recently undone step. A step is one
+    edit, or one group: the edits made between begin_group() and its matching
+    end_group() form a single step, and groups may nest, in which case only the
+    outermost pair forms a step. Calling undo() or redo() while a group is open raises
+    RuntimeError. A new edit made after an undo discards the steps that could still
+    have been redone. undo() with nothing to undo, and redo() with nothing to redo, do
+    nothing.
+    """,
+    [
+        {"setup": "d = Doc(); d.insert(0, 'ab'); d.insert(2, 'c'); d.undo()", "call": "d.text()", "expect": "'ab'"},
+        {"setup": "d = Doc(); d.insert(0, 'ab'); d.insert(2, 'c'); d.undo(); d.redo()", "call": "d.text()", "expect": "'abc'"},
+        {"setup": "d = Doc(); d.begin_group(); d.insert(0, 'x'); d.insert(1, 'y'); d.end_group(); d.undo()",
+         "call": "d.text()", "expect": "''"},
+        {"setup": "d = Doc(); d.insert(0, 'a'); d.undo(); d.insert(0, 'b'); d.redo()", "call": "d.text()", "expect": "'b'"},
+        {"setup": "d = Doc(); d.insert(0, 'abcd'); d.delete(1, 2)", "call": "d.text()", "expect": "'ad'"},
+        {"setup": "d = Doc(); d.begin_group(); d.insert(0, 'x')", "call": "d.undo()", "raises": "RuntimeError"},
+    ],
+    {"mod.py": """
+        class Doc:
+            def __init__(self):
+                self._text = ''
+                self._done = []
+                self._undone = []
+                self._depth = 0
+
+            def text(self):
+                return self._text
+
+            def begin_group(self):
+                self._depth += 1
+
+            def end_group(self):
+                self._depth -= 1
+
+            def _apply(self, edit):
+                kind, pos, s = edit
+                if kind == 'insert':
+                    self._text = self._text[:pos] + s + self._text[pos:]
+                else:
+                    self._text = self._text[:pos] + self._text[pos + len(s):]
+
+            def _invert(self, edit):
+                kind, pos, s = edit
+                return ('delete' if kind == 'insert' else 'insert', pos, s)
+
+            def insert(self, pos, s):
+                if pos < 0 or pos > len(self._text):
+                    raise IndexError(pos)
+                edit = ('insert', pos, s)
+                self._apply(edit)
+                self._done.append(edit)
+
+            def delete(self, pos, n):
+                if pos < 0 or pos + n > len(self._text):
+                    raise IndexError(pos)
+                edit = ('delete', pos, self._text[pos:pos + n])
+                self._apply(edit)
+                self._done.append(edit)
+
+            def undo(self):
+                if not self._done:
+                    return
+                edit = self._done.pop()
+                self._apply(self._invert(edit))
+                self._undone.append(edit)
+
+            def redo(self):
+                if not self._undone:
+                    return
+                edit = self._undone.pop()
+                self._apply(edit)
+                self._done.append(edit)
+    """},
+    {"mod.py": """
+        class Doc:
+            def __init__(self):
+                self._text = ''
+                self._done = []
+                self._undone = []
+                self._depth = 0
+                self._open = None
+
+            def text(self):
+                return self._text
+
+            def begin_group(self):
+                if self._depth == 0:
+                    self._open = []
+                self._depth += 1
+
+            def end_group(self):
+                if self._depth == 0:
+                    raise RuntimeError('no open group')
+                self._depth -= 1
+                if self._depth == 0:
+                    if self._open:
+                        self._done.append(self._open)
+                    self._open = None
+
+            def _apply(self, edit):
+                kind, pos, s = edit
+                if kind == 'insert':
+                    self._text = self._text[:pos] + s + self._text[pos:]
+                else:
+                    self._text = self._text[:pos] + self._text[pos + len(s):]
+
+            def _invert(self, edit):
+                kind, pos, s = edit
+                return ('delete' if kind == 'insert' else 'insert', pos, s)
+
+            def _record(self, edit):
+                self._apply(edit)
+                self._undone.clear()
+                if self._depth:
+                    self._open.append(edit)
+                else:
+                    self._done.append([edit])
+
+            def insert(self, pos, s):
+                if pos < 0 or pos > len(self._text):
+                    raise IndexError(pos)
+                self._record(('insert', pos, s))
+
+            def delete(self, pos, n):
+                if pos < 0 or n < 0 or pos + n > len(self._text):
+                    raise IndexError(pos)
+                self._record(('delete', pos, self._text[pos:pos + n]))
+
+            def undo(self):
+                if self._depth:
+                    raise RuntimeError('group is open')
+                if not self._done:
+                    return
+                step = self._done.pop()
+                for edit in reversed(step):
+                    self._apply(self._invert(edit))
+                self._undone.append(step)
+
+            def redo(self):
+                if self._depth:
+                    raise RuntimeError('group is open')
+                if not self._undone:
+                    return
+                step = self._undone.pop()
+                for edit in step:
+                    self._apply(edit)
+                self._done.append(step)
+    """},
+    tests("""
+    from mod import Doc
+    class T(unittest.TestCase):
+        def test_single_steps(self):
+            d = Doc()
+            d.insert(0, 'ab')
+            d.insert(2, 'c')
+            d.undo()
+            self.assertEqual(d.text(), 'ab')
+            d.redo()
+            self.assertEqual(d.text(), 'abc')
+            d.delete(0, 1)
+            self.assertEqual(d.text(), 'bc')
+            d.undo()
+            self.assertEqual(d.text(), 'abc')
+    """),
+    tests("""
+    from mod import Doc
+    class T(unittest.TestCase):
+        def test_group_is_one_step(self):
+            d = Doc()
+            d.insert(0, 'a')
+            d.begin_group()
+            d.insert(1, 'x')
+            d.insert(2, 'y')
+            d.delete(0, 1)
+            d.end_group()
+            self.assertEqual(d.text(), 'xy')
+            d.undo()
+            self.assertEqual(d.text(), 'a')
+            d.redo()
+            self.assertEqual(d.text(), 'xy')
+        def test_nested_groups_outermost_only(self):
+            d = Doc()
+            d.begin_group()
+            d.insert(0, 'a')
+            d.begin_group()
+            d.insert(1, 'b')
+            d.end_group()
+            d.insert(2, 'c')
+            d.end_group()
+            self.assertEqual(d.text(), 'abc')
+            d.undo()
+            self.assertEqual(d.text(), '')
+            d.redo()
+            self.assertEqual(d.text(), 'abc')
+        def test_new_edit_discards_redo(self):
+            d = Doc()
+            d.insert(0, 'a')
+            d.insert(1, 'b')
+            d.undo()
+            d.insert(1, 'c')
+            d.redo()
+            self.assertEqual(d.text(), 'ac')
+            d.undo()
+            d.undo()
+            d.undo()
+            self.assertEqual(d.text(), '')
+        def test_open_group_blocks_history(self):
+            d = Doc()
+            d.insert(0, 'a')
+            d.begin_group()
+            d.insert(1, 'b')
+            with self.assertRaises(RuntimeError):
+                d.undo()
+            with self.assertRaises(RuntimeError):
+                d.redo()
+            d.end_group()
+            d.undo()
+            self.assertEqual(d.text(), 'a')
+        def test_bounds_change_nothing(self):
+            d = Doc()
+            d.insert(0, 'ab')
+            with self.assertRaises(IndexError):
+                d.insert(3, 'x')
+            with self.assertRaises(IndexError):
+                d.delete(1, 5)
+            self.assertEqual(d.text(), 'ab')
+            d.undo()
+            self.assertEqual(d.text(), '')
+        def test_nothing_to_do(self):
+            d = Doc()
+            d.undo()
+            d.redo()
+            self.assertEqual(d.text(), '')
+            d.insert(0, 'a')
+            d.undo()
+            d.undo()
+            d.redo()
+            d.redo()
+            self.assertEqual(d.text(), 'a')
+    """),
+    {
+        "flat_groups": {"mod.py": """
+            class Doc:
+                def __init__(self):
+                    self._text = ''
+                    self._done = []
+                    self._undone = []
+                    self._depth = 0
+
+                def text(self):
+                    return self._text
+
+                def begin_group(self):
+                    self._depth += 1
+
+                def end_group(self):
+                    self._depth -= 1
+
+                def _apply(self, edit):
+                    kind, pos, s = edit
+                    if kind == 'insert':
+                        self._text = self._text[:pos] + s + self._text[pos:]
+                    else:
+                        self._text = self._text[:pos] + self._text[pos + len(s):]
+
+                def _invert(self, edit):
+                    kind, pos, s = edit
+                    return ('delete' if kind == 'insert' else 'insert', pos, s)
+
+                def _record(self, edit):
+                    self._apply(edit)
+                    self._undone.clear()
+                    self._done.append(edit)
+
+                def insert(self, pos, s):
+                    if pos < 0 or pos > len(self._text):
+                        raise IndexError(pos)
+                    self._record(('insert', pos, s))
+
+                def delete(self, pos, n):
+                    if pos < 0 or pos + n > len(self._text):
+                        raise IndexError(pos)
+                    self._record(('delete', pos, self._text[pos:pos + n]))
+
+                def undo(self):
+                    if self._depth:
+                        raise RuntimeError('group is open')
+                    if not self._done:
+                        return
+                    edit = self._done.pop()
+                    self._apply(self._invert(edit))
+                    self._undone.append(edit)
+
+                def redo(self):
+                    if self._depth:
+                        raise RuntimeError('group is open')
+                    if not self._undone:
+                        return
+                    edit = self._undone.pop()
+                    self._apply(edit)
+                    self._done.append(edit)
+        """},
+        "redo_kept": {"mod.py": """
+            class Doc:
+                def __init__(self):
+                    self._text = ''
+                    self._done = []
+                    self._undone = []
+                    self._depth = 0
+                    self._open = None
+
+                def text(self):
+                    return self._text
+
+                def begin_group(self):
+                    if self._depth == 0:
+                        self._open = []
+                    self._depth += 1
+
+                def end_group(self):
+                    self._depth -= 1
+                    if self._depth == 0:
+                        if self._open:
+                            self._done.append(self._open)
+                        self._open = None
+
+                def _apply(self, edit):
+                    kind, pos, s = edit
+                    if kind == 'insert':
+                        self._text = self._text[:pos] + s + self._text[pos:]
+                    else:
+                        self._text = self._text[:pos] + self._text[pos + len(s):]
+
+                def _invert(self, edit):
+                    kind, pos, s = edit
+                    return ('delete' if kind == 'insert' else 'insert', pos, s)
+
+                def _record(self, edit):
+                    self._apply(edit)
+                    if self._depth:
+                        self._open.append(edit)
+                    else:
+                        self._done.append([edit])
+
+                def insert(self, pos, s):
+                    if pos < 0 or pos > len(self._text):
+                        raise IndexError(pos)
+                    self._record(('insert', pos, s))
+
+                def delete(self, pos, n):
+                    if pos < 0 or pos + n > len(self._text):
+                        raise IndexError(pos)
+                    self._record(('delete', pos, self._text[pos:pos + n]))
+
+                def undo(self):
+                    if self._depth:
+                        raise RuntimeError('group is open')
+                    if not self._done:
+                        return
+                    step = self._done.pop()
+                    for edit in reversed(step):
+                        self._apply(self._invert(edit))
+                    self._undone.append(step)
+
+                def redo(self):
+                    if self._depth:
+                        raise RuntimeError('group is open')
+                    if not self._undone:
+                        return
+                    step = self._undone.pop()
+                    for edit in step:
+                        self._apply(edit)
+                    self._done.append(step)
+        """},
+        "inner_groups_split": {"mod.py": """
+            class Doc:
+                def __init__(self):
+                    self._text = ''
+                    self._done = []
+                    self._undone = []
+                    self._stack = []
+
+                def text(self):
+                    return self._text
+
+                def begin_group(self):
+                    self._stack.append([])
+
+                def end_group(self):
+                    group = self._stack.pop()
+                    if group:
+                        self._done.append(group)
+
+                def _apply(self, edit):
+                    kind, pos, s = edit
+                    if kind == 'insert':
+                        self._text = self._text[:pos] + s + self._text[pos:]
+                    else:
+                        self._text = self._text[:pos] + self._text[pos + len(s):]
+
+                def _invert(self, edit):
+                    kind, pos, s = edit
+                    return ('delete' if kind == 'insert' else 'insert', pos, s)
+
+                def _record(self, edit):
+                    self._apply(edit)
+                    self._undone.clear()
+                    if self._stack:
+                        self._stack[-1].append(edit)
+                    else:
+                        self._done.append([edit])
+
+                def insert(self, pos, s):
+                    if pos < 0 or pos > len(self._text):
+                        raise IndexError(pos)
+                    self._record(('insert', pos, s))
+
+                def delete(self, pos, n):
+                    if pos < 0 or pos + n > len(self._text):
+                        raise IndexError(pos)
+                    self._record(('delete', pos, self._text[pos:pos + n]))
+
+                def undo(self):
+                    if self._stack:
+                        raise RuntimeError('group is open')
+                    if not self._done:
+                        return
+                    step = self._done.pop()
+                    for edit in reversed(step):
+                        self._apply(self._invert(edit))
+                    self._undone.append(step)
+
+                def redo(self):
+                    if self._stack:
+                        raise RuntimeError('group is open')
+                    if not self._undone:
+                        return
+                    step = self._undone.pop()
+                    for edit in step:
+                        self._apply(edit)
+                    self._done.append(step)
+        """},
+    },
+    max_turns=12,
+)
+
+# -------------------------------------------------------------------------- 14
+rung(
+    "reconcile", 14, "Reconciliation", "two files, greedy matching with tie-breaks",
+    """
+    match(bank, ledger) pairs bank rows with ledger rows. Each row is a dict with
+    'amount' (an int of cents), 'date' (a 'YYYY-MM-DD' string), and an optional 'ref'
+    string. A bank row may pair with a ledger row only when the amounts are equal, the
+    dates are at most 3 days apart in either direction, which rules.close_enough(a, b)
+    in rules.py decides, and, when both rows carry a ref, the refs are equal. A row
+    with no ref can pair with any ref. Each row is used at most once. Bank rows are
+    processed in order, and each takes the allowed ledger row with the smallest date
+    gap, and on a tie the one that comes first in ledger. The result is a tuple
+    (pairs, unmatched_bank, unmatched_ledger): pairs is a list of (bank_index,
+    ledger_index) tuples in bank order, and the two unmatched lists hold indexes in
+    rising order. The bug is not necessarily in mod.py.
+    """,
+    [
+        {"call": "match([{'amount': 5, 'date': '2026-01-10'}], [{'amount': 5, 'date': '2026-01-13'}])",
+         "expect": "([(0, 0)], [], [])"},
+        {"call": "match([{'amount': 5, 'date': '2026-01-10'}], [{'amount': 5, 'date': '2026-01-14'}])",
+         "expect": "([], [0], [0])"},
+        {"call": "match([{'amount': 5, 'date': '2026-01-10'}], [{'amount': 5, 'date': '2026-01-12'}, {'amount': 5, 'date': '2026-01-10'}])",
+         "expect": "([(0, 1)], [], [0])"},
+        {"call": "match([{'amount': 5, 'date': '2026-01-10'}], [{'amount': 5, 'date': '2026-01-11'}, {'amount': 5, 'date': '2026-01-09'}])",
+         "expect": "([(0, 0)], [], [1])"},
+        {"call": "match([{'amount': 5, 'date': '2026-01-10', 'ref': 'A'}], [{'amount': 5, 'date': '2026-01-10', 'ref': 'B'}, {'amount': 5, 'date': '2026-01-10'}])",
+         "expect": "([(0, 1)], [], [0])"},
+    ],
+    {
+        "mod.py": """
+            from rules import close_enough
+
+
+            def match(bank, ledger):
+                used = set()
+                pairs = []
+                for i, row in enumerate(bank):
+                    for j, entry in enumerate(ledger):
+                        if j in used:
+                            continue
+                        if row['amount'] != entry['amount']:
+                            continue
+                        if not close_enough(row['date'], entry['date']):
+                            continue
+                        used.add(j)
+                        pairs.append((i, j))
+                        break
+                matched_bank = {i for i, _ in pairs}
+                unmatched_bank = [i for i in range(len(bank)) if i not in matched_bank]
+                unmatched_ledger = [j for j in range(len(ledger)) if j not in used]
+                return pairs, unmatched_bank, unmatched_ledger
+        """,
+        "rules.py": """
+            from datetime import date
+
+
+            def gap_days(a, b):
+                return abs((date.fromisoformat(a) - date.fromisoformat(b)).days)
+
+
+            def close_enough(a, b):
+                return gap_days(a, b) < 3
+        """,
+    },
+    {
+        "mod.py": """
+            from rules import close_enough, gap_days
+
+
+            def _allowed(row, entry):
+                if row['amount'] != entry['amount']:
+                    return False
+                if not close_enough(row['date'], entry['date']):
+                    return False
+                if 'ref' in row and 'ref' in entry and row['ref'] != entry['ref']:
+                    return False
+                return True
+
+
+            def match(bank, ledger):
+                used = set()
+                pairs = []
+                for i, row in enumerate(bank):
+                    best = None
+                    for j, entry in enumerate(ledger):
+                        if j in used or not _allowed(row, entry):
+                            continue
+                        gap = gap_days(row['date'], entry['date'])
+                        if best is None or gap < best[0]:
+                            best = (gap, j)
+                    if best is not None:
+                        used.add(best[1])
+                        pairs.append((i, best[1]))
+                matched_bank = {i for i, _ in pairs}
+                unmatched_bank = [i for i in range(len(bank)) if i not in matched_bank]
+                unmatched_ledger = [j for j in range(len(ledger)) if j not in used]
+                return pairs, unmatched_bank, unmatched_ledger
+        """,
+        "rules.py": """
+            from datetime import date
+
+
+            def gap_days(a, b):
+                return abs((date.fromisoformat(a) - date.fromisoformat(b)).days)
+
+
+            def close_enough(a, b):
+                return gap_days(a, b) <= 3
+        """,
+    },
+    tests("""
+    from mod import match
+    class T(unittest.TestCase):
+        def test_exact(self):
+            bank = [{'amount': 5, 'date': '2026-01-10'}, {'amount': 7, 'date': '2026-01-11'}]
+            ledger = [{'amount': 7, 'date': '2026-01-11'}, {'amount': 5, 'date': '2026-01-10'}, {'amount': 9, 'date': '2026-01-11'}]
+            self.assertEqual(match(bank, ledger), ([(0, 1), (1, 0)], [], [2]))
+            self.assertEqual(match([{'amount': 5, 'date': '2026-01-10'}], [{'amount': 5, 'date': '2026-01-12'}]), ([(0, 0)], [], []))
+    """),
+    tests("""
+    from mod import match
+    from rules import close_enough
+    class T(unittest.TestCase):
+        def test_three_days_inclusive(self):
+            self.assertEqual(match([{'amount': 5, 'date': '2026-01-10'}], [{'amount': 5, 'date': '2026-01-13'}]), ([(0, 0)], [], []))
+            self.assertEqual(match([{'amount': 5, 'date': '2026-01-10'}], [{'amount': 5, 'date': '2026-01-07'}]), ([(0, 0)], [], []))
+            self.assertEqual(match([{'amount': 5, 'date': '2026-01-10'}], [{'amount': 5, 'date': '2026-01-14'}]), ([], [0], [0]))
+            self.assertTrue(close_enough('2026-01-31', '2026-02-03'))
+            self.assertFalse(close_enough('2026-01-31', '2026-02-04'))
+        def test_closest_wins(self):
+            ledger = [{'amount': 5, 'date': '2026-01-12'}, {'amount': 5, 'date': '2026-01-10'}]
+            self.assertEqual(match([{'amount': 5, 'date': '2026-01-10'}], ledger), ([(0, 1)], [], [0]))
+        def test_tie_goes_to_first_in_ledger(self):
+            ledger = [{'amount': 5, 'date': '2026-01-11'}, {'amount': 5, 'date': '2026-01-09'}]
+            self.assertEqual(match([{'amount': 5, 'date': '2026-01-10'}], ledger), ([(0, 0)], [], [1]))
+            ledger = [{'amount': 5, 'date': '2026-01-09'}, {'amount': 5, 'date': '2026-01-11'}]
+            self.assertEqual(match([{'amount': 5, 'date': '2026-01-10'}], ledger), ([(0, 0)], [], [1]))
+        def test_refs(self):
+            ledger = [{'amount': 5, 'date': '2026-01-10', 'ref': 'B'}, {'amount': 5, 'date': '2026-01-10'}]
+            self.assertEqual(match([{'amount': 5, 'date': '2026-01-10', 'ref': 'A'}], ledger), ([(0, 1)], [], [0]))
+            ledger = [{'amount': 5, 'date': '2026-01-10', 'ref': 'B'}, {'amount': 5, 'date': '2026-01-10', 'ref': 'A'}]
+            self.assertEqual(match([{'amount': 5, 'date': '2026-01-12', 'ref': 'A'}], ledger), ([(0, 1)], [], [0]))
+            self.assertEqual(match([{'amount': 5, 'date': '2026-01-12'}], ledger), ([(0, 0)], [], [1]))
+            self.assertEqual(match([{'amount': 5, 'date': '2026-01-12', 'ref': 'C'}], ledger), ([], [0], [0, 1]))
+        def test_each_row_once_and_order(self):
+            bank = [{'amount': 5, 'date': '2026-01-10'}, {'amount': 5, 'date': '2026-01-10'}, {'amount': 5, 'date': '2026-01-20'}]
+            ledger = [{'amount': 5, 'date': '2026-01-10'}, {'amount': 1, 'date': '2026-01-10'}]
+            self.assertEqual(match(bank, ledger), ([(0, 0)], [1, 2], [1]))
+            bank = [{'amount': 5, 'date': '2026-01-10'}, {'amount': 5, 'date': '2026-01-10'}]
+            ledger = [{'amount': 5, 'date': '2026-01-12'}, {'amount': 5, 'date': '2026-01-10'}]
+            self.assertEqual(match(bank, ledger), ([(0, 1), (1, 0)], [], []))
+    """),
+    {
+        "exclusive_days": {
+            "mod.py": """
+                from rules import close_enough, gap_days
+
+
+                def _allowed(row, entry):
+                    if row['amount'] != entry['amount']:
+                        return False
+                    if not close_enough(row['date'], entry['date']):
+                        return False
+                    if 'ref' in row and 'ref' in entry and row['ref'] != entry['ref']:
+                        return False
+                    return True
+
+
+                def match(bank, ledger):
+                    used = set()
+                    pairs = []
+                    for i, row in enumerate(bank):
+                        best = None
+                        for j, entry in enumerate(ledger):
+                            if j in used or not _allowed(row, entry):
+                                continue
+                            gap = gap_days(row['date'], entry['date'])
+                            if best is None or gap < best[0]:
+                                best = (gap, j)
+                        if best is not None:
+                            used.add(best[1])
+                            pairs.append((i, best[1]))
+                    matched_bank = {i for i, _ in pairs}
+                    unmatched_bank = [i for i in range(len(bank)) if i not in matched_bank]
+                    unmatched_ledger = [j for j in range(len(ledger)) if j not in used]
+                    return pairs, unmatched_bank, unmatched_ledger
+            """,
+            "rules.py": """
+                from datetime import date
+
+
+                def gap_days(a, b):
+                    return abs((date.fromisoformat(a) - date.fromisoformat(b)).days)
+
+
+                def close_enough(a, b):
+                    return gap_days(a, b) < 3
+            """,
+        },
+        "first_candidate": {
+            "mod.py": """
+                from rules import close_enough
+
+
+                def _allowed(row, entry):
+                    if row['amount'] != entry['amount']:
+                        return False
+                    if not close_enough(row['date'], entry['date']):
+                        return False
+                    if 'ref' in row and 'ref' in entry and row['ref'] != entry['ref']:
+                        return False
+                    return True
+
+
+                def match(bank, ledger):
+                    used = set()
+                    pairs = []
+                    for i, row in enumerate(bank):
+                        for j, entry in enumerate(ledger):
+                            if j in used or not _allowed(row, entry):
+                                continue
+                            used.add(j)
+                            pairs.append((i, j))
+                            break
+                    matched_bank = {i for i, _ in pairs}
+                    unmatched_bank = [i for i in range(len(bank)) if i not in matched_bank]
+                    unmatched_ledger = [j for j in range(len(ledger)) if j not in used]
+                    return pairs, unmatched_bank, unmatched_ledger
+            """,
+            "rules.py": """
+                from datetime import date
+
+
+                def gap_days(a, b):
+                    return abs((date.fromisoformat(a) - date.fromisoformat(b)).days)
+
+
+                def close_enough(a, b):
+                    return gap_days(a, b) <= 3
+            """,
+        },
+        "ref_required": {
+            "mod.py": """
+                from rules import close_enough, gap_days
+
+
+                def _allowed(row, entry):
+                    if row['amount'] != entry['amount']:
+                        return False
+                    if not close_enough(row['date'], entry['date']):
+                        return False
+                    if row.get('ref') != entry.get('ref'):
+                        return False
+                    return True
+
+
+                def match(bank, ledger):
+                    used = set()
+                    pairs = []
+                    for i, row in enumerate(bank):
+                        best = None
+                        for j, entry in enumerate(ledger):
+                            if j in used or not _allowed(row, entry):
+                                continue
+                            gap = gap_days(row['date'], entry['date'])
+                            if best is None or gap < best[0]:
+                                best = (gap, j)
+                        if best is not None:
+                            used.add(best[1])
+                            pairs.append((i, best[1]))
+                    matched_bank = {i for i, _ in pairs}
+                    unmatched_bank = [i for i in range(len(bank)) if i not in matched_bank]
+                    unmatched_ledger = [j for j in range(len(ledger)) if j not in used]
+                    return pairs, unmatched_bank, unmatched_ledger
+            """,
+            "rules.py": """
+                from datetime import date
+
+
+                def gap_days(a, b):
+                    return abs((date.fromisoformat(a) - date.fromisoformat(b)).days)
+
+
+                def close_enough(a, b):
+                    return gap_days(a, b) <= 3
+            """,
+        },
+    },
+    max_turns=12,
+)
+
+# -------------------------------------------------------------------------- 15
+rung(
+    "ranges", 15, "Range counting at scale", "non-functional requirement, green tests",
     """
     count_in_ranges(points, ranges) takes a list of integers and a list of (lo, hi)
     pairs and returns a list with, for each pair in order, how many points p satisfy
@@ -1895,9 +3184,9 @@ rung(
     max_turns=12, test_timeout=12.0,
 )
 
-# -------------------------------------------------------------------------- 13
+# -------------------------------------------------------------------------- 16
 rung(
-    "allocate", 13, "Largest remainder", "spec above a wrong public test",
+    "allocate", 16, "Largest remainder", "spec above a wrong public test",
     """
     allocate(total, weights) splits the non-negative integer total into len(weights)
     non-negative integers that sum to total and are proportional to the weights, which
@@ -2004,6 +3293,9 @@ BUG_PASSES = {
     "shlex": [],
     "jsonptr": [],
     "cron": ["test_only_one_restricted", "test_other_fields"],
+    "expr": ["test_spacing_and_mixing", "test_types"],
+    "undo": ["test_bounds_change_nothing", "test_nothing_to_do"],
+    "reconcile": ["test_tie_goes_to_first_in_ledger"],
     "ranges": ["test_inputs_untouched", "test_small"],
     "allocate": ["test_sum_and_bounds"],
 }

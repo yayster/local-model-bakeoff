@@ -1,1 +1,1 @@
-"""Ladder v2: thirteen agentic repair rungs for local models. See ladder/README.md."""
+"""Ladder v2: sixteen agentic repair rungs for local models. See ladder/README.md."""
