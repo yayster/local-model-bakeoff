@@ -36,6 +36,8 @@ def rung_cell(row: dict) -> str:
     extra = []
     if row.get("error"):
         extra.append("err")
+    if row.get("stop_reason") == "length":
+        extra.append("length")
     if row["flags"].get("ran_out_of_turns"):
         extra.append("turns")
     if row["flags"].get("stopped_red"):
@@ -76,7 +78,7 @@ def render(reports: list[dict]) -> str:
         cells = [rung_cell(rows[rid]) if rid in rows else "-" for rid in rung_ids]
         lines.append(f"| {d['model']} | " + " | ".join(cells) + " |")
     lines.append("")
-    lines.append("Cell legend: `pass`, or hidden cases passed out of total; `turns` ran out of turns; `red` stopped with public tests failing; `wrote-tests` tried to edit a test; `err` a request failed.")
+    lines.append("Cell legend: `pass`, or hidden cases passed out of total; `turns` ran out of turns; `length` a reply hit the generation cap; `red` stopped with public tests failing; `wrote-tests` tried to edit a test; `err` a request failed.")
     lines.append("")
     lines.append("## Per-rung pass rate across models")
     lines.append("")

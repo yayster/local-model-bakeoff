@@ -62,6 +62,12 @@ def user_prompt(rung: dict, total: int) -> str:
 
 # ----------------------------------------------------------------------------- clients
 
+class MalformedToolCall(Exception):
+    """The model produced a tool call the server could not parse. Ollama 0.40 reports
+    this as HTTP 500 with "invalid tool call arguments" instead of returning the
+    message, so the harness turns it into a bad tool call and lets the model retry."""
+
+
 class OllamaClient:
     def __init__(self, host: str, model: str, num_predict: int, timeout: float,
                  keep_alive: str, think: bool, num_ctx: int | None, seed: int):
@@ -91,6 +97,30 @@ class OllamaClient:
             return json.load(resp)
 
     def chat(self, messages: list) -> tuple[dict, dict]:
+        """One model call. A server-side failure (HTTP 5xx, connection reset) is retried
+        twice with a short pause, so one hiccup does not decide a rung."""
+        last = None
+        for attempt in range(3):
+            try:
+                return self._chat_once(messages)
+            except urllib.error.HTTPError as exc:
+                body = ""
+                try:
+                    body = exc.read().decode(errors="replace")
+                except Exception:  # noqa: BLE001
+                    pass
+                if "invalid tool call" in body:
+                    raise MalformedToolCall(body[:300]) from None
+                if exc.code < 500:
+                    raise
+                last = exc
+            except (urllib.error.URLError, ConnectionError, TimeoutError) as exc:
+                last = exc
+            print(f"  retry {attempt + 1} after {type(last).__name__}: {str(last)[:80]}", flush=True)
+            time.sleep(5 * (attempt + 1))
+        raise last
+
+    def _chat_once(self, messages: list) -> tuple[dict, dict]:
         options = {"temperature": 0, "seed": self.seed, "num_predict": self.num_predict}
         if self.num_ctx:
             options["num_ctx"] = self.num_ctx
@@ -109,6 +139,8 @@ class OllamaClient:
         msg = data.get("message") or {}
         meta = {
             "wall": round(wall, 2),
+            "thinking_chars": len(msg.get("thinking") or ""),
+            "content_chars": len(msg.get("content") or ""),
             "prompt_eval_count": data.get("prompt_eval_count"),
             "eval_count": data.get("eval_count"),
             "eval_duration": data.get("eval_duration"),
@@ -216,6 +248,16 @@ def run_rung(client, rung: dict, total: int, max_turns: int | None, transcript_d
         for n in range(1, budget + 1):
             try:
                 msg, meta = client.chat(messages)
+            except MalformedToolCall as exc:
+                ws.events["bad_tool_calls"] += 1
+                ws.events["malformed_tool_calls"] = ws.events.get("malformed_tool_calls", 0) + 1
+                messages.append({"role": "user", "content": (
+                    "Your previous reply held a tool call whose arguments were not valid JSON, "
+                    "so it was dropped. Send the call again with valid JSON arguments. "
+                    "Keep run_python snippets short.")})
+                turns.append({"n": n, "wall": 0.0, "tools": [], "content": "", "malformed_tool_call": str(exc)[:200]})
+                print(f"  turn {n} malformed tool call, nudged", flush=True)
+                continue
             except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
                 error = f"{type(exc).__name__}: {str(exc)[:300]}"
                 stop_reason = "error"
@@ -276,7 +318,8 @@ def run_rung(client, rung: dict, total: int, max_turns: int | None, transcript_d
             "writes": len(ev["writes"]),
             "test_write_attempts": ev["test_write_attempts"],
             "bad_tool_calls": ev["bad_tool_calls"],
-            "no_tool_calls": all(not t["tools"] for t in turns),
+            "malformed_tool_calls": ev.get("malformed_tool_calls", 0),
+            "no_tool_calls": all(not t.get("tools") for t in turns),
             "stopped_red": stop_reason == "stop" and not scored["public"]["ok"] and rung["gold_passes_public"],
             "ran_out_of_turns": stop_reason == "turns",
         },
@@ -327,6 +370,7 @@ def score(rows: list[dict]) -> dict:
         "prompt_tokens": sum(r["prompt_tokens"] for r in rows),
         "seconds": round(sum(r["seconds"] for r in rows), 1),
         "errors": sum(1 for r in rows if r["error"]),
+        "length_stops": sum(1 for r in rows if r["stop_reason"] == "length"),
         "stopped_red": sum(1 for r in rows if r["flags"]["stopped_red"]),
         "test_write_attempts": sum(r["flags"]["test_write_attempts"] for r in rows),
         "ran_out_of_turns": sum(1 for r in rows if r["flags"]["ran_out_of_turns"]),
