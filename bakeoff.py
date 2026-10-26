@@ -186,14 +186,28 @@ def run_repair(script: str, host: str, model: str) -> dict:
     return {"script": script, "returncode": proc.returncode}
 
 
+def run_ladder2(host: str, model: str) -> dict:
+    proc = subprocess.run(
+        [sys.executable, str(ROOT / "ladder" / "run.py"), host, model],
+        cwd=ROOT,
+        text=True,
+    )
+    safe = model.replace(":", "-").replace("/", "-")
+    path = ROOT / "results" / "ladder" / f"{safe}.json"
+    summary = {"script": "ladder/run.py", "returncode": proc.returncode, "file": str(path)}
+    if path.is_file():
+        summary["score"] = json.loads(path.read_text()).get("score")
+    return summary
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the local-model bake-off")
     parser.add_argument("host", help="Ollama base URL, for example http://127.0.0.1:11434")
     parser.add_argument("model", help="Model tag, for example qwen3.8:27b")
     parser.add_argument(
         "--sections",
-        default="speed,quiz,ceiling,repair,ladder",
-        help="Comma list: speed,quiz,ceiling,repair,ladder",
+        default="speed,quiz,ceiling,repair,ladder,ladder2",
+        help="Comma list: speed,quiz,ceiling,repair,ladder,ladder2",
     )
     args = parser.parse_args()
     sections = [s.strip() for s in args.sections.split(",") if s.strip()]
@@ -208,6 +222,8 @@ def main() -> int:
         report["sections"]["repair"] = run_repair("loop.py", args.host, args.model)
     if "ladder" in sections:
         report["sections"]["ladder"] = run_repair("loop2.py", args.host, args.model)
+    if "ladder2" in sections:
+        report["sections"]["ladder2"] = run_ladder2(args.host, args.model)
     out_dir = ROOT / "results"
     out_dir.mkdir(exist_ok=True)
     safe = args.model.replace(":", "-").replace("/", "-")
