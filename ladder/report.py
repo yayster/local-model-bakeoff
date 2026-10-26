@@ -31,19 +31,28 @@ def load(no_mock: bool) -> list[dict]:
     return reports
 
 
-def rung_cell(row: dict) -> str:
-    mark = "pass" if row["passed"] else f"{row['hidden_passed']}/{row['hidden_total']}"
+def rung_cell(rows: list[dict]) -> str:
+    """One cell for one rung of one model, folded over its repeats."""
+    n = len(rows)
+    passed = sum(r["passed"] for r in rows)
+    if passed == n:
+        mark = "pass" if n == 1 else f"pass {n}/{n}"
+    else:
+        best = max(rows, key=lambda r: r["hidden_passed"])
+        mark = (f"{passed}/{n}, best " if n > 1 else "") + f"{best['hidden_passed']}/{best['hidden_total']}"
     extra = []
-    if row.get("error"):
+    if any(r.get("error") for r in rows):
         extra.append("err")
-    if row.get("stop_reason") == "length":
+    if any(r.get("stop_reason") == "length" for r in rows):
         extra.append("length")
-    if row["flags"].get("ran_out_of_turns"):
+    if any(r["flags"].get("ran_out_of_turns") for r in rows):
         extra.append("turns")
-    if row["flags"].get("stopped_red"):
+    if any(r["flags"].get("stopped_red") for r in rows):
         extra.append("red")
-    if row["flags"].get("test_write_attempts"):
+    if any(r["flags"].get("test_write_attempts") for r in rows):
         extra.append("wrote-tests")
+    if any(r["flags"].get("malformed_tool_calls") for r in rows):
+        extra.append("malformed")
     return mark + (" " + ",".join(extra) if extra else "")
 
 
@@ -74,18 +83,21 @@ def render(reports: list[dict]) -> str:
     lines.append(header)
     lines.append("|---|" + "---|" * len(rung_ids))
     for d in reports:
-        rows = {r["id"]: r for r in d["runs"][0]["rows"]}
-        cells = [rung_cell(rows[rid]) if rid in rows else "-" for rid in rung_ids]
+        by_rung: dict = {}
+        for run in d["runs"]:
+            for r in run["rows"]:
+                by_rung.setdefault(r["id"], []).append(r)
+        cells = [rung_cell(by_rung[rid]) if rid in by_rung else "-" for rid in rung_ids]
         lines.append(f"| {d['model']} | " + " | ".join(cells) + " |")
     lines.append("")
-    lines.append("Cell legend: `pass`, or hidden cases passed out of total; `turns` ran out of turns; `length` a reply hit the generation cap; `red` stopped with public tests failing; `wrote-tests` tried to edit a test; `err` a request failed.")
+    lines.append("Cell legend: `pass`, or repeats passed and the best hidden-case count; `turns` ran out of turns; `length` a reply hit the generation cap; `red` stopped with public tests failing; `wrote-tests` tried to edit a test; `malformed` a tool call the server could not parse; `err` a request failed.")
     lines.append("")
     lines.append("## Per-rung pass rate across models")
     lines.append("")
-    lines.append("| Rung | Skill | Pass rate |")
+    lines.append("| Rung | Skill | Pass rate over every climb |")
     lines.append("|---|---|---|")
     for rid in rung_ids:
-        rows = [r for d in reports for r in d["runs"][0]["rows"] if r["id"] == rid]
+        rows = [r for d in reports for run in d["runs"] for r in run["rows"] if r["id"] == rid]
         if rows:
             rate = sum(r["passed"] for r in rows) / len(rows)
             lines.append(f"| {rows[0]['level']} {rid} | {rows[0]['skill']} | {rate:.0%} of {len(rows)} |")

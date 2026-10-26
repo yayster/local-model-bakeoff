@@ -39,7 +39,7 @@ A right value wrapped in `\boxed{}` or bold counts as a miss. That is how Laguna
 
 ## Results
 
-Quiz, ceiling, and speed land in `results/<model>.json`. Repair logs land in `repair/results/`. Ladder v2 results and transcripts land in `results/ladder/`, and `python3 ladder/report.py` folds them into one table. Those directories are gitignored.
+Quiz, ceiling, and speed land in `results/<model>.json`. Repair logs land in `repair/results/`. Ladder v2 results and transcripts land in `results/ladder/`, and `python3 ladder/report.py` folds them into one table. The 2026-10-26 climbs of all five models are summarised in `ladder/README.md`. Those directories are gitignored.
 
 ## Seat notes from the run this suite repeats
 

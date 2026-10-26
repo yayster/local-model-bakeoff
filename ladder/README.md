@@ -108,6 +108,50 @@ no passes, and cheat must light the test-write flag on every rung.
 Every result file carries a hash of the specs, bugs, tests, and turn budgets. Two
 results with different hashes ran different ladders and do not belong in one table.
 
+## Results, 2026-10-26
+
+Ladder hash `f344b4221dbe`, three repeats per model, think off, temperature 0, seed 0,
+every model at 100% GPU. The four large models ran on abzu (Ollama 0.40.11, context
+131072); the 9B ran on zerotwo (Ollama 0.40.6, context 65536). Medians across repeats.
+
+| Model | Passed | Gain | Height (min to max) | Median turns on a pass | Tokens | Minutes |
+|---|---|---|---|---|---|---|
+| qwen3.8:27b | 13/16 | 94% | 8 (8 to 8) | 4 | 14k | 4.2 |
+| ornith-1.5:35b | 12/16 | 84% | 8 (8 to 8) | 6.5 | 18k | 3.3 |
+| laguna-xs-2.1:q4_K_M | 11/16 | 86% | 8 (6 to 8) | 8 | 27k | 3.9 |
+| flint:40b | 11/16 | 74% | 8 (8 to 8) | 5 | 7.5k | 1.6 |
+| ornith-1.5:9b | 10/16 | 72% | 3 (3 to 3) | 6 | 41k | 28.9 |
+
+What the climbs showed:
+
+- **The thirteen-rung draft could not rank these models.** qwen3.8:27b, flint:40b, and
+  ornith-1.5:9b all passed 11 of 13. Rungs 12 to 14 (expr, undo, reconcile) were added
+  for that reason and spread the field to 13, 12, 11, 11, 10.
+- **Every model fell on shlex and expr.** All five dropped the empty word from `''`,
+  the `drop_empty` trap, even with the example in the spec. On expr the common fault
+  was unary minus binding tighter than `**`. Those two rungs are the current ceiling;
+  jsonptr (50%) and cron (25%) sit just below it.
+- **Nobody cheated.** Zero attempts to write a test, zero stops with public tests red,
+  across 80 climbs. On the authority rung every model except the 27B held the spec
+  above the wrong assertion; the 27B also held it but sorted by exact share instead of
+  remainder, and the remainders case caught that.
+- **Cost is the second axis.** flint:40b and qwen3.8:27b solve the rungs they solve in
+  four or five turns and a few hundred tokens each. The 9B takes seven times the
+  tokens and seven times the wall time for three fewer rungs, and it ran out of turns
+  on five rungs per climb.
+- **Temperature 0 is stable here but not fixed.** The 27B, 35B, and 9B scored the same
+  on all three repeats; flint moved between 11 and 12 and laguna between 11 and 12 with
+  height 6 to 8. One climb is a draft; three is a ranking.
+- **Rung order is not yet difficulty order.** Pooled over all climbs the pass rates are
+  100% on rungs 1 to 6 and 8, then config 92%, undo 75%, reconcile 73%, allocate 80%,
+  jsonptr 50%, cron 25%, shlex 0%, expr 0%. A v3 should move shlex and expr above
+  cron, and reconcile down, so that height means what it says. Intervals (rung 4) is
+  the one low rung with signal: the 9B skipped the sort on every climb.
+- **Ollama 0.40.11 turns a malformed tool call into HTTP 500.** The 35B emits a
+  truncated `run_python` call at the same point of expr on every climb. The harness now
+  feeds that back as a bad tool call and continues; the 35B then spends its remaining
+  turns running snippets without writing a fix.
+
 ## Reading a result
 
 Look at passed first, then gain, then height and the flags. Two models with the same
