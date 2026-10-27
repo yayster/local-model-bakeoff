@@ -121,6 +121,17 @@ every model at 100% GPU. The four large models ran on abzu (Ollama 0.40.11, cont
 | laguna-xs-2.1:q4_K_M | 11/16 | 86% | 8 (6 to 8) | 8 | 27k | 3.9 |
 | flint:40b | 11/16 | 74% | 8 (8 to 8) | 5 | 7.5k | 1.6 |
 | ornith-1.5:9b | 10/16 | 72% | 3 (3 to 3) | 6 | 41k | 28.9 |
+| glm-5.3-flash:cloud | 16/16 | 100% | 16 (16 to 16) | 6 | 38k | 3.5 |
+
+`glm-5.3-flash:cloud` is Ollama's cloud-proxied tag, run through zerotwo later the same
+day: no GPU seat, and its minutes measure the cloud service. It climbed all sixteen
+rungs on all three repeats, which also proves every rung is solvable from the spec by
+a real model, not only by the gold. Two caveats. With thinking off it still writes
+long analysis into the visible reply and hit the 3000-token cap before its first tool
+call on nine rungs across the three climbs; the harness now nudges it and it recovers.
+On the classic sections the same leak cost it two format misses (quiz 9/10, ceiling
+4/5) because the last line carried reasoning text; repair and the old ladder were
+8/8 and 8/8, and speed reads 0 because the cloud tag reports no decode duration.
 
 What the climbs showed:
 
