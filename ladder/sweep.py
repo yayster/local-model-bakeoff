@@ -51,14 +51,19 @@ def main() -> int:
     for name in loaded(host):
         print(f"unloading {name} that was already resident", flush=True)
         unload(host, name)
+    worst = 0
     for model in models:
         print(f"######## {model} {time.strftime('%H:%M:%S')}", flush=True)
         t0 = time.time()
         proc = subprocess.run([sys.executable, str(HERE / "run.py"), host, model, *extra])
         print(f"######## {model} exit {proc.returncode} after {(time.time() - t0) / 60:.1f} min", flush=True)
+        worst = max(worst, abs(proc.returncode))
         unload(host, model)
-    subprocess.run([sys.executable, str(HERE / "report.py"), "--no-mock"])
-    return 0
+    report = subprocess.run([sys.executable, str(HERE / "report.py"), "--no-mock"])
+    worst = max(worst, abs(report.returncode))
+    if worst:
+        print(f"######## sweep finished with failures, exit {worst}", flush=True)
+    return min(worst, 255)
 
 
 if __name__ == "__main__":

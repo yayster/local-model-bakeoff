@@ -3,11 +3,24 @@
 Everything a rung run touches lives in a throwaway directory. The model works
 through five tools. Tests run in a subprocess with a timeout and report every
 test case by name so a rung can earn partial credit.
+
+Grading isolation, and its limits. The hidden test source is piped to the test
+interpreter on stdin and executed from memory, so it is never a file the
+submission can open. The pass bit comes back on a private pipe, not stdout, and
+the runner exits with os._exit so no atexit hook can speak after it. The runner
+also checks that unittest's assertion methods are the same objects after the run
+as before it. Subprocesses get a scrubbed environment, no user site, and a cwd
+inside the throwaway directory. This is not a sandbox: code that runs in the
+same interpreter as the assertions, or that walks /proc, can still subvert a
+grade. The flags record what the harness can see. Run untrusted models inside a
+container.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -76,25 +89,39 @@ TOOLS = [
 
 TOOL_NAMES = [t["function"]["name"] for t in TOOLS]
 
-# The runner imports a test file by path and prints one JSON line naming every
-# test that passed or failed. It is written into the workdir for each run and
-# removed afterwards.
-RUNNER = r'''
-import importlib.util, json, sys, unittest
-path = sys.argv[1]
-spec = importlib.util.spec_from_file_location("_ladder_test", path)
-mod = importlib.util.module_from_spec(spec)
-try:
-    spec.loader.exec_module(mod)
-except BaseException as exc:
-    print("@@RESULT " + json.dumps({"ran": 0, "passed": [], "failed": [], "import_error": repr(exc)[:400]}))
-    sys.exit(1)
+# The runner reads the test source from stdin, executes it as an in-memory module,
+# runs it, and writes one JSON result to the file descriptor named in argv[1].
+# It never touches the filesystem for the tests and it exits with os._exit so that
+# nothing registered by the submission runs after the result is written.
+RUNNER = r"""
+import json, os, sys, types, unittest
+fd = int(sys.argv[1])
 only = sys.argv[2] if len(sys.argv) > 2 else None
+src = sys.stdin.read()
+sys.stdin.close()
+guard = dict(vars(unittest.TestCase))
+guard_runner = (unittest.TextTestRunner, unittest.TestResult, unittest.TestSuite, unittest.defaultTestLoader)
+unittest_module = unittest
+
+def emit(payload, code):
+    try:
+        os.write(fd, json.dumps(payload).encode())
+    finally:
+        os.close(fd)
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(code)
+
+mod = types.ModuleType("_ladder_test")
+mod.__file__ = "<hidden>"
+try:
+    exec(compile(src, "<hidden>", "exec"), mod.__dict__)
+except BaseException as exc:
+    emit({"ran": 0, "passed": [], "failed": [], "import_error": repr(exc)[:400]}, 1)
 loaded = unittest.defaultTestLoader.loadTestsFromModule(mod)
-names = []
-picked = []
-def walk(s):
-    for t in s:
+names, picked = [], []
+def walk(suite):
+    for t in suite:
         if isinstance(t, unittest.TestSuite):
             walk(t)
         else:
@@ -103,27 +130,45 @@ def walk(s):
                 names.append(name)
                 picked.append(t)
 walk(loaded)
-suite = unittest.TestSuite(picked)
-res = unittest.TextTestRunner(stream=sys.stderr, verbosity=1).run(suite)
+res = unittest.TextTestRunner(stream=sys.stderr, verbosity=1).run(unittest.TestSuite(picked))
 bad = [t.id().rsplit(".", 1)[-1] for t, _ in res.failures + res.errors]
-print("@@RESULT " + json.dumps({"ran": res.testsRun, "passed": [n for n in names if n not in bad], "failed": bad}))
-sys.exit(0 if res.wasSuccessful() else 1)
-'''
+tampered = (sys.modules.get("unittest") is not unittest_module
+            or any(vars(unittest.TestCase).get(k) is not v for k, v in guard.items())
+            or (unittest.TextTestRunner, unittest.TestResult, unittest.TestSuite, unittest.defaultTestLoader) != guard_runner)
+if tampered:
+    emit({"ran": res.testsRun, "passed": [], "failed": names, "tampered": True}, 1)
+emit({"ran": res.testsRun, "passed": [n for n in names if n not in bad], "failed": bad}, 0 if res.wasSuccessful() else 1)
+"""
+
+
+def child_env() -> dict:
+    """A scrubbed environment for anything that runs submitted code."""
+    return {
+        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONHASHSEED": "0",
+        "HOME": tempfile.gettempdir(),
+    }
+
+
+PY_FLAGS = ["-E", "-s", "-B"]  # ignore PYTHON* env, no user site, no bytecode
 
 
 def run_tests(workdir: Path, test_src: str, timeout: float = 10.0, per_case: bool = True) -> dict:
-    """Run one unittest file against the project in workdir. Returns a report dict.
+    """Run one unittest source against the project in workdir. Returns a report dict.
 
     A whole-file timeout hides which cases would have passed, so after one the
     cases are re-run one at a time, each with its own timeout.
     """
-    report = _run_file(workdir, test_src, timeout, None)
+    report = _run_once(workdir, test_src, timeout, None)
     if not report.get("timed_out") or not per_case:
         return report
     names = re.findall(r"def (test_\w+)", test_src)
     passed, failed, slow = [], [], []
     for name in names:
-        one = _run_file(workdir, test_src, timeout, name)
+        one = _run_once(workdir, test_src, timeout, name)
         if one["ok"]:
             passed.append(name)
         else:
@@ -134,37 +179,50 @@ def run_tests(workdir: Path, test_src: str, timeout: float = 10.0, per_case: boo
             "text": f"timeout after {timeout}s in " + ", ".join(slow)}
 
 
-def _run_file(workdir: Path, test_src: str, timeout: float, only: str | None) -> dict:
-    runner = workdir / "_ladder_runner.py"
-    test_path = workdir / "_ladder_test.py"
-    runner.write_text(RUNNER)
-    test_path.write_text(test_src)
-    cmd = [sys.executable, str(runner), str(test_path)] + ([only] if only else [])
+def _run_once(workdir: Path, test_src: str, timeout: float, only: str | None) -> dict:
+    """One test interpreter. The test source goes in on stdin, the verdict comes back
+    on a private pipe, and only that pipe decides the result."""
+    rfd, wfd = os.pipe()
+    cmd = [sys.executable, *PY_FLAGS, "-c", RUNNER, str(wfd)] + ([only] if only else [])
     try:
-        proc = subprocess.run(cmd, cwd=workdir, text=True, capture_output=True, timeout=timeout)
-    except subprocess.TimeoutExpired:
-        names = [only] if only else re.findall(r"def (test_\w+)", test_src)
-        return {"ok": False, "ran": 0, "passed": [], "failed": names, "timed_out": True,
-                "text": f"timeout after {timeout}s"}
+        try:
+            proc = subprocess.run(
+                cmd, cwd=workdir, env=child_env(), input=test_src, text=True,
+                capture_output=True, timeout=timeout, pass_fds=(wfd,),
+            )
+        except subprocess.TimeoutExpired:
+            names = [only] if only else re.findall(r"def (test_\w+)", test_src)
+            return {"ok": False, "ran": 0, "passed": [], "failed": names, "timed_out": True,
+                    "text": f"timeout after {timeout}s"}
+        finally:
+            os.close(wfd)
+        raw = b""
+        while True:
+            chunk = os.read(rfd, 65536)
+            if not chunk:
+                break
+            raw += chunk
     finally:
-        for p in (runner, test_path):
-            try:
-                p.unlink()
-            except OSError:
-                pass
+        os.close(rfd)
+    report = {"ok": False, "ran": 0, "passed": [], "failed": [], "timed_out": False}
+    verdict = None
+    try:
+        verdict = json.loads(raw.decode()) if raw else None
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        verdict = None
+    if isinstance(verdict, dict):
+        report.update({k: verdict[k] for k in ("ran", "passed", "failed", "import_error", "tampered") if k in verdict})
+        report["ok"] = proc.returncode == 0 and not verdict.get("tampered") and not report["failed"] and report["ran"] > 0
+    else:
+        names = [only] if only else re.findall(r"def (test_\w+)", test_src)
+        report["failed"] = names
+        report["no_verdict"] = True
     text = (proc.stdout + "\n" + proc.stderr).strip()
-    report = {"ok": proc.returncode == 0, "ran": 0, "passed": [], "failed": [], "timed_out": False}
-    for line in proc.stdout.splitlines():
-        if line.startswith("@@RESULT "):
-            try:
-                report.update(json.loads(line[len("@@RESULT "):]))
-            except json.JSONDecodeError:
-                pass
-    # Strip the marker from what the model sees.
-    shown = "\n".join(ln for ln in text.splitlines() if not ln.startswith("@@RESULT "))
-    if len(shown) > 2500:
-        shown = shown[-2500:]
-    report["text"] = shown or ("pass" if report["ok"] else "fail")
+    if len(text) > 2500:
+        text = text[-2500:]
+    if report.get("tampered"):
+        text += "\nunittest was modified during the run; the rung is scored as failed"
+    report["text"] = text or ("pass" if report["ok"] else "fail")
     return report
 
 
@@ -222,6 +280,18 @@ class Workspace:
             "test_write_attempts": 0, "bad_tool_calls": 0, "last_public_ok": None,
             "read_spec": False,
         }
+        # Files the model must not change. run_python can touch them, so they are
+        # restored and counted after every snippet.
+        self.protected = {name: (self.dir / name).read_text() for name in ("SPEC.txt", "test_public.py")}
+
+    def _restore_protected(self) -> int:
+        changed = 0
+        for name, content in self.protected.items():
+            path = self.dir / name
+            if not path.is_file() or path.read_text() != content:
+                path.write_text(content)
+                changed += 1
+        return changed
 
     def dispatch(self, name: str, args) -> str:
         if isinstance(args, str):
@@ -278,7 +348,12 @@ class Workspace:
                 self.events["bad_tool_calls"] += 1
                 return "error: code must be a string"
             self.events["python_runs"] += 1
-            return run_snippet(self.dir, code)
+            out = run_snippet(self.dir, code)
+            touched = self._restore_protected()
+            if touched:
+                self.events["test_write_attempts"] += touched
+                out += "\nnote: the spec and tests were restored; they cannot be changed"
+            return out
         self.events["bad_tool_calls"] += 1
         return f"error: unknown tool {name}. Tools: {', '.join(TOOL_NAMES)}"
 
@@ -291,23 +366,17 @@ class Workspace:
 
 
 def run_snippet(wd: Path, code: str, timeout: float = 6.0) -> str:
-    path = wd / "_ladder_snippet.py"
-    path.write_text(code)
     try:
         proc = subprocess.run(
-            [sys.executable, str(path)],
+            [sys.executable, *PY_FLAGS, "-c", code],
             cwd=wd,
+            env=child_env(),
             text=True,
             capture_output=True,
             timeout=timeout,
         )
     except subprocess.TimeoutExpired:
         return f"timeout after {timeout}s"
-    finally:
-        try:
-            path.unlink()
-        except OSError:
-            pass
     text = (proc.stdout + ("\n" + proc.stderr if proc.stderr else "")).strip()
     if len(text) > 3000:
         text = text[-3000:]

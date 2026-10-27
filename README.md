@@ -15,6 +15,7 @@ A single section:
 ```bash
 python3 bakeoff.py http://127.0.0.1:11434 flint:40b --sections speed,quiz
 python3 bakeoff.py http://127.0.0.1:11434 ornith-1.5:35b --sections ceiling
+python3 bakeoff.py http://127.0.0.1:11434 qwen3.8:27b --sections ladder2
 python3 repair/loop.py --check
 python3 repair/loop2.py --check
 python3 ladder/run.py --check
@@ -31,7 +32,7 @@ python3 ladder/run.py --check
 | `ceiling` | Five long traces from `tasks/ceiling.json` | Last line, 5 items. A length stop is retried once at 6000 tokens |
 | `repair` | Eight Python repairs. The model gets `read_file`, `write_file`, and `run_tests`. Five turns | Hidden tests |
 | `ladder` | Eight harder repairs. Six turns. Public tests already pass on the bug | Hidden tests |
-| `ladder2` | Sixteen rungs of rising difficulty, five tools, traps and a self-check. See `ladder/README.md` | Height, gain, flags |
+| `ladder2` | Sixteen rungs of rising difficulty, five tools, traps and a self-check. Not in the default list; minutes on a 27B, half an hour on a 9B. See `ladder/README.md` | Passed, gain, height, flags |
 
 Settings match the bake-off: `think` false, temperature 0. The request does not set `num_ctx`, so the server's context window is the seat. The published run used 131072.
 

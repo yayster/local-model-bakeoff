@@ -28,6 +28,10 @@ Record accuracy, time to first token, prefill and decode tok/s, and reply length
 
 ## ladder v3
 
+- Run submissions in a container (bwrap or docker) when grading a model that is not
+  trusted. The harness hardens the obvious paths but shares an interpreter with the
+  assertions; see "What the harness defends" in ladder/README.md.
+
 - Reorder rungs by observed difficulty: shlex and expr above cron, reconcile down,
   so that height is a trustworthy headline. This changes the hash; rerun all five.
 - Consider a rung or two above shlex and expr; every model now fails both.

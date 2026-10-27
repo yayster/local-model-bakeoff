@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import statistics
 import subprocess
@@ -504,6 +505,11 @@ def main() -> int:
     ap.add_argument("--no-transcripts", action="store_true")
     args = ap.parse_args()
 
+    # Submitted code runs in child processes that can read this process's cwd and
+    # environment through /proc. Leave the repository before any of it runs.
+    os.chdir(tempfile.mkdtemp(prefix="ladder-cwd-"))
+    for key in ("PWD", "OLDPWD", "PYTHONPATH"):
+        os.environ.pop(key, None)
     selected = rung_defs.by_id(args.rungs.split(",")) if args.rungs else list(rung_defs.RUNGS)
     if not selected:
         print("no rungs matched", file=sys.stderr)

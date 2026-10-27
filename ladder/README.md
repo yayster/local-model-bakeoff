@@ -105,13 +105,34 @@ harness, tool dispatch, grading, flags, and report can be exercised without a GP
 Gold must reach height 16, lazy and loop must reach 0, trap must earn partial gain and
 no passes, and cheat must light the test-write flag on every rung.
 
-Every result file carries a hash of the specs, bugs, tests, and turn budgets. Two
-results with different hashes ran different ladders and do not belong in one table.
+Every result file carries a hash of the specs, bugs, tests, turn budgets, test
+timeouts, and prompt-shaping fields. Two results with different hashes ran different
+ladders and do not belong in one table.
+
+## What the harness defends, and what it does not
+
+The hidden test source is piped to the test interpreter on stdin and executed from
+memory, so it is never a file beside the submission. The verdict comes back on a
+private pipe, not stdout, and the runner leaves through `os._exit`, so nothing the
+submission registers can speak after it. The runner checks that unittest's assertion
+methods and classes are the same objects after the run as before. Child processes get
+a scrubbed environment, no user site, and the harness process itself moves out of the
+repository before any submitted code runs, so `/proc/<ppid>/cwd` does not point at the
+answer key. `run_python` cannot keep a change to the spec or the public test: both are
+restored after every snippet and the attempt is counted as a test write.
+
+That is hardening, not a sandbox. Submitted code still runs in the same interpreter as
+the assertions, and a process that walks `/proc` can still find the repository through
+an open log file. A local model at temperature 0 does not do these things, and the
+flags would show most attempts, but a model you do not trust belongs in a container.
 
 ## Results, 2026-10-26
 
-Ladder hash `f344b4221dbe`, three repeats per model, think off, temperature 0, seed 0,
-every model at 100% GPU. The four large models ran on abzu (Ollama 0.40.11, context
+Ladder hash `f344b4221dbe` at the time of these climbs, three repeats per model,
+think off, temperature 0, seed 0, every model at 100% GPU. After review the ranges
+rung now times the call against the spec's own 2 second limit and checks every count
+through a digest, which changed the hash; every recorded ranges pass ran well under a
+second, so these numbers stand, but a strict comparison with a new climb needs a rerun. The four large models ran on abzu (Ollama 0.40.11, context
 131072); the 9B ran on zerotwo (Ollama 0.40.6, context 65536). Medians across repeats.
 
 | Model | Passed | Gain | Height (min to max) | Median turns on a pass | Tokens | Minutes |

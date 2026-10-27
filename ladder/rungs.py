@@ -3082,8 +3082,8 @@ rung(
     lo <= p <= hi. Points are unsorted and may repeat. A pair with hi below lo counts
     zero. The input lists are left as they were. Each list can hold 100000 entries and
     that size must finish in under 2 seconds on an ordinary machine. The public tests
-    are small, but the hidden tests include the large size, so a loop over every point
-    for every pair will time out.
+    are small, but the hidden tests include the large size and time the call, so a
+    loop over every point for every pair will fail.
     """,
     [
         {"call": "count_in_ranges([1, 5, 5, 9], [(1, 5), (6, 8), (5, 5)])", "expect": "[3, 0, 2]"},
@@ -3118,7 +3118,7 @@ rung(
             self.assertEqual(count_in_ranges([], [(0, 1)]), [0])
     """),
     tests("""
-    import random, time
+    import hashlib, json, random, time
     from mod import count_in_ranges
     class T(unittest.TestCase):
         def test_small(self):
@@ -3144,10 +3144,12 @@ rung(
             got = count_in_ranges(points, ranges)
             elapsed = time.perf_counter() - t0
             self.assertEqual(len(got), n)
-            for i in range(0, n, n // 40):
+            for i in range(0, n, n // 10):
                 lo, hi = ranges[i]
                 self.assertEqual(got[i], sum(1 for p in points if lo <= p <= hi))
-            self.assertLess(elapsed, 4.0)
+            digest = hashlib.sha256(json.dumps([int(x) for x in got]).encode()).hexdigest()
+            self.assertEqual(digest, '84f31c35062b05d6d46607b35f554f8cb99a91bee76b6a366277a2c42a63ddde')
+            self.assertLess(elapsed, 2.0)
     """),
     {
         "sort_in_place": {"mod.py": """
@@ -3307,7 +3309,8 @@ def ladder_hash() -> str:
     """Hash of everything that affects a score, so results say which ladder they ran."""
     h = hashlib.sha256()
     for r in RUNGS:
-        for key in ("id", "level", "spec", "files_buggy", "public", "hidden", "note", "max_turns"):
+        for key in ("id", "level", "spec", "files_buggy", "public", "hidden", "note", "max_turns",
+                    "test_timeout", "gold_passes_public"):
             h.update(json.dumps(r[key], sort_keys=True).encode())
     return h.hexdigest()[:12]
 

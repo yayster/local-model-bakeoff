@@ -206,8 +206,9 @@ def main() -> int:
     parser.add_argument("model", help="Model tag, for example qwen3.8:27b")
     parser.add_argument(
         "--sections",
-        default="speed,quiz,ceiling,repair,ladder,ladder2",
-        help="Comma list: speed,quiz,ceiling,repair,ladder,ladder2",
+        default="speed,quiz,ceiling,repair,ladder",
+        help="Comma list: speed,quiz,ceiling,repair,ladder,ladder2. ladder2 is the v2 ladder "
+             "(minutes on a 27B, half an hour on a 9B) and is not in the default list",
     )
     args = parser.parse_args()
     sections = [s.strip() for s in args.sections.split(",") if s.strip()]
