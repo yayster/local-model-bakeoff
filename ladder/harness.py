@@ -1,28 +1,33 @@
 """Sandbox, tools, and grading for the v2 ladder.
 
 Everything a rung run touches lives in a throwaway directory. The model works
-through five tools. Tests run in a subprocess with a timeout and report every
-test case by name so a rung can earn partial credit.
+through five tools. Tests run under a timeout and report every test case by
+name so a rung can earn partial credit.
 
-Grading isolation, and its limits. The hidden test source is piped to the test
-interpreter on stdin and executed from memory, so it is never a file the
-submission can open. The pass bit comes back on a private pipe, not stdout, and
-the runner exits with os._exit so no atexit hook can speak after it. The runner
-also checks that unittest's assertion methods are the same objects after the run
-as before it. Subprocesses get a scrubbed environment, no user site, and a cwd
-inside the throwaway directory. This is not a sandbox: code that runs in the
-same interpreter as the assertions, or that walks /proc, can still subvert a
-grade. The flags record what the harness can see. Run untrusted models inside a
-container.
+Grading uses two processes. The assertion process receives the hidden test
+source on stdin, keeps it in memory, runs unittest, and writes the verdict to a
+private pipe that only it holds. It never imports the submission. Every call a
+test makes into the submission goes over a JSON protocol to a worker process,
+which is the only place submitted code runs. The worker sees no test source, no
+verdict pipe, and nothing on its argv but the protocol. Returned values come
+back as data; objects stay in the worker behind handles; exceptions are rebuilt
+by type; mutable arguments are synced back after each call so in-place changes
+are seen. Both processes get a scrubbed environment and no user site.
+
+Limits. The worker can still read the filesystem as the harness user and walk
+/proc. The harness entry points move out of the repository and re-exec with a
+neutral argv so their own cwd, environ, and cmdline do not name it, but a shell
+that launched them from inside the repository still does. A model you do not
+trust belongs in a container.
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -89,27 +94,312 @@ TOOLS = [
 
 TOOL_NAMES = [t["function"]["name"] for t in TOOLS]
 
-# The runner reads the test source from stdin, executes it as an in-memory module,
-# runs it, and writes one JSON result to the file descriptor named in argv[1].
-# It never touches the filesystem for the tests and it exits with os._exit so that
-# nothing registered by the submission runs after the result is written.
-RUNNER = r"""
-import json, os, sys, types, unittest
+PY_FLAGS = ["-E", "-s", "-B"]  # ignore PYTHON* env, no user site, no bytecode
+
+
+def child_env() -> dict:
+    """A scrubbed environment for anything that runs submitted code."""
+    return {
+        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONHASHSEED": "0",
+        "HOME": tempfile.gettempdir(),
+    }
+
+
+# --------------------------------------------------------------------- protocol
+# A JSON encoding for the values that cross between the assertion process and
+# the worker. JSON-native values pass as they are. Tuples, sets, dicts with
+# non-string keys, dates, bytes, odd floats, and object handles are lists whose
+# first element is a tag that no ordinary value starts with.
+CODEC = r'''
+import json as _json, datetime as _dt
+_T, _S, _D, _DT, _DA, _B, _F, _H = "\x00t", "\x00s", "\x00d", "\x00dt", "\x00da", "\x00b", "\x00f", "\x00h"
+
+def enc(v, handles):
+    if v is None or isinstance(v, bool) or isinstance(v, str):
+        return v
+    if isinstance(v, int):
+        return int(v)
+    if isinstance(v, float):
+        if v != v or v in (float("inf"), float("-inf")):
+            return [_F, repr(v)]
+        return float(v)
+    if isinstance(v, _dt.datetime):
+        return [_DT, v.isoformat()]
+    if isinstance(v, _dt.date):
+        return [_DA, v.isoformat()]
+    if isinstance(v, (bytes, bytearray)):
+        return [_B, bytes(v).hex()]
+    if isinstance(v, list):
+        return [enc(x, handles) for x in v]
+    if isinstance(v, tuple):
+        return [_T] + [enc(x, handles) for x in v]
+    if isinstance(v, (set, frozenset)):
+        return [_S, isinstance(v, frozenset)] + [enc(x, handles) for x in v]
+    if isinstance(v, dict):
+        if all(isinstance(k, str) and not k.startswith("\x00") for k in v):
+            return {k: enc(x, handles) for k, x in v.items()}
+        return [_D] + [[enc(k, handles), enc(x, handles)] for k, x in v.items()]
+    return [_H, handles.put(v), type(v).__name__]
+
+def dec(e, mk):
+    if isinstance(e, list):
+        if e and isinstance(e[0], str) and e[0].startswith("\x00"):
+            tag = e[0]
+            if tag == _T:
+                return tuple(dec(x, mk) for x in e[1:])
+            if tag == _S:
+                return (frozenset if e[1] else set)(dec(x, mk) for x in e[2:])
+            if tag == _D:
+                return {dec(k, mk): dec(x, mk) for k, x in e[1:]}
+            if tag == _DT:
+                return _dt.datetime.fromisoformat(e[1])
+            if tag == _DA:
+                return _dt.date.fromisoformat(e[1])
+            if tag == _B:
+                return bytes.fromhex(e[1])
+            if tag == _F:
+                return float(e[1])
+            if tag == _H:
+                return mk(e[1], e[2])
+        return [dec(x, mk) for x in e]
+    if isinstance(e, dict):
+        return {k: dec(x, mk) for k, x in e.items()}
+    return e
+'''
+
+# The worker: the only process that imports the submission. It answers describe,
+# call, new, method, and getattr requests, one JSON line each. Anything the
+# submission prints goes to stderr so it cannot touch the protocol stream.
+WORKER_BODY = r'''
+import sys, importlib, builtins
+_out = sys.stdout
+sys.stdout = sys.stderr
+
+class Handles:
+    def __init__(self):
+        self.objs, self.n = {}, 0
+    def put(self, o):
+        self.n += 1
+        self.objs[self.n] = o
+        return self.n
+    def get(self, i):
+        return self.objs[i]
+
+H = Handles()
+mk = lambda i, cls: H.get(i)
+
+def send(obj):
+    _out.write(_json.dumps(obj) + "\n")
+    _out.flush()
+
+def exc_record(exc):
+    return {"type": type(exc).__name__, "module": type(exc).__module__,
+            "mro": [c.__name__ for c in type(exc).__mro__], "msg": str(exc)[:500]}
+
+def builtin_base(cls):
+    for c in cls.__mro__:
+        if c.__module__ == "builtins" and issubclass(c, BaseException):
+            return c.__name__
+    return "Exception"
+
+def describe(name):
+    m = importlib.import_module(name)
+    names = {}
+    for k in dir(m):
+        if k.startswith("__"):
+            continue
+        v = getattr(m, k)
+        if isinstance(v, type):
+            if issubclass(v, BaseException):
+                names[k] = {"kind": "exception", "base": builtin_base(v)}
+            else:
+                names[k] = {"kind": "class"}
+        elif callable(v):
+            names[k] = {"kind": "function"}
+        else:
+            names[k] = {"kind": "value", "value": enc(v, H)}
+    return names
+
+for line in sys.stdin:
+    try:
+        req = _json.loads(line)
+        op = req["op"]
+        if op == "describe":
+            send({"ok": True, "names": describe(req["module"])})
+            continue
+        if op == "getattr":
+            send({"ok": True, "value": enc(getattr(H.get(req["handle"]), req["name"]), H), "args": None})
+            continue
+        args = dec(req.get("args", []), mk)
+        kwargs = dec(req.get("kwargs", {}), mk)
+        if op == "method":
+            target = getattr(H.get(req["handle"]), req["name"])
+        else:
+            target = getattr(importlib.import_module(req["module"]), req["name"])
+        before = _json.dumps(enc(args, H))
+        try:
+            value = target(*args, **kwargs)
+        except KeyboardInterrupt:
+            raise
+        except BaseException as exc:
+            after = _json.dumps(enc(args, H))
+            send({"ok": False, "exc": exc_record(exc), "args": None if after == before else _json.loads(after)})
+            continue
+        after = _json.dumps(enc(args, H))
+        if op == "new":
+            out = [_H, H.put(value), type(value).__name__]
+        else:
+            out = enc(value, H)
+        send({"ok": True, "value": out, "args": None if after == before else _json.loads(after)})
+    except KeyboardInterrupt:
+        raise
+    except BaseException as exc:
+        send({"ok": False, "exc": exc_record(exc), "args": None})
+'''
+
+# The assertion process: reads the hidden source from stdin, proxies every
+# submission module the tests import to the worker, runs unittest, and writes
+# the verdict to the private fd in argv[1]. argv[2] lists the modules it may
+# proxy; argv[3] optionally names a single test method.
+RUNNER_BODY = r'''
+import os, sys, types, threading, subprocess, unittest, builtins, importlib.abc, importlib.machinery
+
 fd = int(sys.argv[1])
-only = sys.argv[2] if len(sys.argv) > 2 else None
+allowed = set(sys.argv[2].split(","))
+only = sys.argv[3] if len(sys.argv) > 3 else None
 src = sys.stdin.read()
 sys.stdin.close()
-guard = dict(vars(unittest.TestCase))
-guard_runner = (unittest.TextTestRunner, unittest.TestResult, unittest.TestSuite, unittest.defaultTestLoader)
-unittest_module = unittest
+
+worker = subprocess.Popen([sys.executable, "-E", "-s", "-B", "-c", WORKER_SRC],
+                          stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          text=True, env=dict(os.environ))
+worker_err = []
+def drain():
+    for line in worker.stderr:
+        if sum(len(x) for x in worker_err) < 20000:
+            worker_err.append(line)
+threading.Thread(target=drain, daemon=True).start()
+
+class Dead(Exception):
+    pass
+
+def rpc(req):
+    try:
+        worker.stdin.write(_json.dumps(req) + "\n")
+        worker.stdin.flush()
+        line = worker.stdout.readline()
+    except (BrokenPipeError, OSError, ValueError):
+        line = ""
+    if not line:
+        raise Dead("the submission process died")
+    return _json.loads(line)
+
+class Proxy:
+    def __init__(self, hid, cls):
+        object.__setattr__(self, "_hid", hid)
+        object.__setattr__(self, "_cls", cls)
+    def __getattr__(self, name):
+        def method(*a, **k):
+            return invoke({"op": "method", "handle": self._hid, "name": name,
+                           "args": enc(list(a), AH), "kwargs": enc(k, AH)}, a)
+        return method
+    def __repr__(self):
+        return "<%s>" % self._cls
+
+class AHandles:
+    def put(self, o):
+        return o._hid if isinstance(o, Proxy) else -1
+AH = AHandles()
+mkp = lambda i, cls: Proxy(i, cls)
+
+def sync(old, fresh):
+    if isinstance(old, list) and isinstance(fresh, list):
+        old[:] = fresh
+    elif isinstance(old, dict) and isinstance(fresh, dict):
+        old.clear(); old.update(fresh)
+    elif isinstance(old, set) and isinstance(fresh, (set, frozenset)):
+        old.clear(); old.update(fresh)
+
+proxy_exceptions = {}
+
+def make_exc(rec):
+    key = (rec.get("module"), rec.get("type"))
+    if key in proxy_exceptions:
+        return proxy_exceptions[key](rec.get("msg", ""))
+    for name in rec.get("mro", []):
+        cls = getattr(builtins, name, None)
+        if isinstance(cls, type) and issubclass(cls, BaseException):
+            return cls(rec.get("msg", ""))
+    return RuntimeError(rec.get("msg", ""))
+
+def invoke(req, args):
+    resp = rpc(req)
+    if resp.get("args") is not None:
+        for old, fresh in zip(args, dec(resp["args"], mkp)):
+            sync(old, fresh)
+    if resp.get("ok"):
+        return dec(resp.get("value"), mkp)
+    raise make_exc(resp.get("exc") or {})
+
+def build(mod, name, info):
+    kind = info.get("kind")
+    if kind == "function":
+        def fn(*a, **k):
+            return invoke({"op": "call", "module": mod, "name": name,
+                           "args": enc(list(a), AH), "kwargs": enc(k, AH)}, a)
+        fn.__name__ = name
+        return fn
+    if kind == "exception":
+        base = getattr(builtins, info.get("base", "Exception"), Exception)
+        if not (isinstance(base, type) and issubclass(base, BaseException)):
+            base = Exception
+        cls = type(name, (base,), {})
+        proxy_exceptions[(mod, name)] = cls
+        return cls
+    if kind == "class":
+        def new(cls_, *a, **k):
+            return invoke({"op": "new", "module": mod, "name": name,
+                           "args": enc(list(a), AH), "kwargs": enc(k, AH)}, a)
+        return type(name, (), {"__new__": new})
+    return dec(info.get("value"), mkp)
+
+class Finder(importlib.abc.MetaPathFinder, importlib.abc.Loader):
+    def find_spec(self, name, path=None, target=None):
+        if name in allowed:
+            return importlib.machinery.ModuleSpec(name, self)
+        return None
+    def create_module(self, spec):
+        resp = rpc({"op": "describe", "module": spec.name})
+        if not resp.get("ok"):
+            raise ImportError((resp.get("exc") or {}).get("msg", "import failed"))
+        m = types.ModuleType(spec.name)
+        for k, info in resp["names"].items():
+            m.__dict__[k] = build(spec.name, k, info)
+        return m
+    def exec_module(self, module):
+        pass
+
+sys.meta_path.insert(0, Finder())
 
 def emit(payload, code):
     try:
-        os.write(fd, json.dumps(payload).encode())
+        worker.kill()
+    except OSError:
+        pass
+    try:
+        sys.stderr.write("".join(worker_err)[-4000:])
+        sys.stderr.flush()
+        sys.stdout.flush()
+    except Exception:
+        pass
+    try:
+        os.write(fd, _json.dumps(payload).encode())
     finally:
         os.close(fd)
-    sys.stdout.flush()
-    sys.stderr.flush()
     os._exit(code)
 
 mod = types.ModuleType("_ladder_test")
@@ -132,28 +422,12 @@ def walk(suite):
 walk(loaded)
 res = unittest.TextTestRunner(stream=sys.stderr, verbosity=1).run(unittest.TestSuite(picked))
 bad = [t.id().rsplit(".", 1)[-1] for t, _ in res.failures + res.errors]
-tampered = (sys.modules.get("unittest") is not unittest_module
-            or any(vars(unittest.TestCase).get(k) is not v for k, v in guard.items())
-            or (unittest.TextTestRunner, unittest.TestResult, unittest.TestSuite, unittest.defaultTestLoader) != guard_runner)
-if tampered:
-    emit({"ran": res.testsRun, "passed": [], "failed": names, "tampered": True}, 1)
-emit({"ran": res.testsRun, "passed": [n for n in names if n not in bad], "failed": bad}, 0 if res.wasSuccessful() else 1)
-"""
+emit({"ran": res.testsRun, "passed": [n for n in names if n not in bad], "failed": bad},
+     0 if res.wasSuccessful() else 1)
+'''
 
-
-def child_env() -> dict:
-    """A scrubbed environment for anything that runs submitted code."""
-    return {
-        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
-        "LANG": "C.UTF-8",
-        "LC_ALL": "C.UTF-8",
-        "PYTHONDONTWRITEBYTECODE": "1",
-        "PYTHONHASHSEED": "0",
-        "HOME": tempfile.gettempdir(),
-    }
-
-
-PY_FLAGS = ["-E", "-s", "-B"]  # ignore PYTHON* env, no user site, no bytecode
+WORKER_SRC = CODEC + WORKER_BODY
+RUNNER_SRC = CODEC + "WORKER_SRC = " + repr(WORKER_SRC) + "\n" + RUNNER_BODY
 
 
 def run_tests(workdir: Path, test_src: str, timeout: float = 10.0, per_case: bool = True) -> dict:
@@ -180,22 +454,24 @@ def run_tests(workdir: Path, test_src: str, timeout: float = 10.0, per_case: boo
 
 
 def _run_once(workdir: Path, test_src: str, timeout: float, only: str | None) -> dict:
-    """One test interpreter. The test source goes in on stdin, the verdict comes back
-    on a private pipe, and only that pipe decides the result."""
+    """One assertion process plus its worker, in their own session so a timeout
+    kills both. Only the private pipe decides the result."""
+    modules = ",".join(sorted(p.stem for p in workdir.glob("*.py") if not p.name.startswith("test")))
     rfd, wfd = os.pipe()
-    cmd = [sys.executable, *PY_FLAGS, "-c", RUNNER, str(wfd)] + ([only] if only else [])
+    cmd = [sys.executable, *PY_FLAGS, "-c", RUNNER_SRC, str(wfd), modules] + ([only] if only else [])
+    names = [only] if only else re.findall(r"def (test_\w+)", test_src)
+    proc = subprocess.Popen(cmd, cwd=workdir, env=child_env(), stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                            pass_fds=(wfd,), start_new_session=True)
+    os.close(wfd)
     try:
         try:
-            proc = subprocess.run(
-                cmd, cwd=workdir, env=child_env(), input=test_src, text=True,
-                capture_output=True, timeout=timeout, pass_fds=(wfd,),
-            )
+            out, err = proc.communicate(input=test_src, timeout=timeout)
         except subprocess.TimeoutExpired:
-            names = [only] if only else re.findall(r"def (test_\w+)", test_src)
+            _kill_session(proc)
             return {"ok": False, "ran": 0, "passed": [], "failed": names, "timed_out": True,
                     "text": f"timeout after {timeout}s"}
-        finally:
-            os.close(wfd)
+        _kill_session(proc)
         raw = b""
         while True:
             chunk = os.read(rfd, 65536)
@@ -205,25 +481,33 @@ def _run_once(workdir: Path, test_src: str, timeout: float, only: str | None) ->
     finally:
         os.close(rfd)
     report = {"ok": False, "ran": 0, "passed": [], "failed": [], "timed_out": False}
-    verdict = None
     try:
         verdict = json.loads(raw.decode()) if raw else None
     except (json.JSONDecodeError, UnicodeDecodeError):
         verdict = None
     if isinstance(verdict, dict):
-        report.update({k: verdict[k] for k in ("ran", "passed", "failed", "import_error", "tampered") if k in verdict})
-        report["ok"] = proc.returncode == 0 and not verdict.get("tampered") and not report["failed"] and report["ran"] > 0
+        report.update({k: verdict[k] for k in ("ran", "passed", "failed", "import_error") if k in verdict})
+        report["ok"] = proc.returncode == 0 and not report["failed"] and report["ran"] > 0
     else:
-        names = [only] if only else re.findall(r"def (test_\w+)", test_src)
         report["failed"] = names
         report["no_verdict"] = True
-    text = (proc.stdout + "\n" + proc.stderr).strip()
+    text = ((out or "") + "\n" + (err or "")).strip()
     if len(text) > 2500:
         text = text[-2500:]
-    if report.get("tampered"):
-        text += "\nunittest was modified during the run; the rung is scored as failed"
     report["text"] = text or ("pass" if report["ok"] else "fail")
     return report
+
+
+def _kill_session(proc: subprocess.Popen) -> None:
+    """Kill the assertion process and everything in its session (the worker)."""
+    try:
+        os.killpg(proc.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        pass
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        pass
 
 
 def materialize(rung: dict, files: dict, root: Path) -> Path:
@@ -366,18 +650,15 @@ class Workspace:
 
 
 def run_snippet(wd: Path, code: str, timeout: float = 6.0) -> str:
+    proc = subprocess.Popen([sys.executable, *PY_FLAGS, "-c", code], cwd=wd, env=child_env(),
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                            start_new_session=True)
     try:
-        proc = subprocess.run(
-            [sys.executable, *PY_FLAGS, "-c", code],
-            cwd=wd,
-            env=child_env(),
-            text=True,
-            capture_output=True,
-            timeout=timeout,
-        )
+        out, err = proc.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
+        _kill_session(proc)
         return f"timeout after {timeout}s"
-    text = (proc.stdout + ("\n" + proc.stderr if proc.stderr else "")).strip()
+    text = (out + ("\n" + err if err else "")).strip()
     if len(text) > 3000:
         text = text[-3000:]
     return text or f"(no output, exit {proc.returncode})"

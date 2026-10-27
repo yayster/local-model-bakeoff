@@ -177,6 +177,37 @@ class OllamaClient:
         }
 
 
+PROBE = r"""
+import glob, os
+root = os.path.basename(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) if "__file__" in dir() else ""
+needle = b"local-model-" + b"bakeoff"  # split so this snippet's own cmdline is not a hit
+hits = []
+for p in glob.glob("/proc/[0-9]*"):
+    pid = p.rsplit("/", 1)[-1]
+    if pid == str(os.getpid()):
+        continue
+    for f in ("cmdline", "environ"):
+        try:
+            data = open(p + "/" + f, "rb").read()
+        except OSError:
+            continue
+        if needle in data:
+            try:
+                comm = open(p + "/comm").read().strip()
+            except OSError:
+                comm = "?"
+            hits.append(f"{pid} {comm} {f}")
+    try:
+        if needle in os.readlink(p + "/cwd").encode():
+            hits.append(f"{pid} {open(p + '/comm').read().strip()} cwd")
+    except OSError:
+        pass
+print("processes naming the repository: " + (str(len(hits)) if hits else "none"))
+for h in hits:
+    print(h)
+"""
+
+
 class MockClient:
     """A scripted model used to prove the loop, tools, grading, and reports end to end.
 
@@ -185,6 +216,8 @@ class MockClient:
     trap:  writes the first trap, runs the tests, stops.
     cheat: tries to rewrite test_public.py, then writes gold, then stops.
     loop:  runs the tests forever and never stops.
+    probe: runs one snippet that searches /proc for the repository path and prints
+           what it found, then stops. Use it to see what a submission can see.
     """
 
     def __init__(self, kind: str, rung: dict | None = None):
@@ -207,6 +240,12 @@ class MockClient:
         k, t = self.kind, self.turn
         if k == "lazy":
             return {"role": "assistant", "content": "Looks fine to me."}, meta
+        if k == "probe":
+            if t == 1:
+                return {"role": "assistant", "content": "", "tool_calls": self._calls(("run_python", {"code": PROBE}))}, meta
+            seen = next((m["content"] for m in reversed(messages) if m["role"] == "tool"), "")
+            print("  probe saw:\n" + "\n".join("    " + ln for ln in seen.splitlines()), flush=True)
+            return {"role": "assistant", "content": "probe done"}, meta
         if k == "loop":
             return {"role": "assistant", "content": "", "tool_calls": self._calls(("run_tests", {}))}, meta
         if t == 1:
@@ -491,7 +530,7 @@ def main() -> int:
     ap.add_argument("host", nargs="?", help="Ollama base URL, for example http://127.0.0.1:11434")
     ap.add_argument("model", nargs="?", help="Model tag, for example ornith-1.5:9b")
     ap.add_argument("--check", action="store_true", help="Validate rungs, golds, traps, and examples. No model.")
-    ap.add_argument("--mock", choices=["gold", "lazy", "trap", "cheat", "loop"], help="Drive the loop with a scripted model")
+    ap.add_argument("--mock", choices=["gold", "lazy", "trap", "cheat", "loop", "probe"], help="Drive the loop with a scripted model")
     ap.add_argument("--rungs", default="", help="Comma list of rung ids or levels, default all")
     ap.add_argument("--repeats", type=int, default=1, help="Run the whole ladder this many times")
     ap.add_argument("--max-turns", type=int, default=None, help="Override every rung's turn budget")
@@ -506,7 +545,8 @@ def main() -> int:
     args = ap.parse_args()
 
     # Submitted code runs in child processes that can read this process's cwd and
-    # environment through /proc. Leave the repository before any of it runs.
+    # environment through /proc. Leave the repository before any of it runs; the
+    # argv was neutralised by boot.neutral_argv before main() started.
     os.chdir(tempfile.mkdtemp(prefix="ladder-cwd-"))
     for key in ("PWD", "OLDPWD", "PYTHONPATH"):
         os.environ.pop(key, None)
@@ -584,4 +624,6 @@ def aggregate(scores: list[dict]) -> dict:
 
 
 if __name__ == "__main__":
+    import boot
+    boot.neutral_argv(__file__)
     raise SystemExit(main())

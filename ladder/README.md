@@ -111,20 +111,32 @@ ladders and do not belong in one table.
 
 ## What the harness defends, and what it does not
 
-The hidden test source is piped to the test interpreter on stdin and executed from
-memory, so it is never a file beside the submission. The verdict comes back on a
-private pipe, not stdout, and the runner leaves through `os._exit`, so nothing the
-submission registers can speak after it. The runner checks that unittest's assertion
-methods and classes are the same objects after the run as before. Child processes get
-a scrubbed environment, no user site, and the harness process itself moves out of the
-repository before any submitted code runs, so `/proc/<ppid>/cwd` does not point at the
-answer key. `run_python` cannot keep a change to the spec or the public test: both are
-restored after every snippet and the attempt is counted as a test write.
+Grading runs in two processes. The assertion process receives the hidden test source
+on stdin, keeps it in memory, runs unittest, and writes the verdict to a private pipe
+that only it holds. It never imports the submission. Every call a test makes into the
+submission crosses a JSON protocol to a worker process, the only place submitted code
+runs: functions, classes, instances, and exceptions are proxied, and mutable arguments
+are synced back after each call so in-place changes are seen. The worker has no test
+source to read, no verdict pipe to write, and nothing on its argv but the protocol.
+A submission that forges a verdict, walks its own frames for the hidden source, patches
+unittest, prints a fake result, registers an atexit hook, or calls `os._exit(0)` is
+scored failed; `python3 ladder/run.py --check` and the exploit list in the PR history
+cover each of those. Both processes get a scrubbed environment and no user site, and a
+timeout kills the whole session so no worker outlives its run.
 
-That is hardening, not a sandbox. Submitted code still runs in the same interpreter as
-the assertions, and a process that walks `/proc` can still find the repository through
-an open log file. A local model at temperature 0 does not do these things, and the
-flags would show most attempts, but a model you do not trust belongs in a container.
+The harness processes do not name the repository. `run.py`, `sweep.py`, and
+`bakeoff.py` re-exec with a neutral argv before anything runs, move out of the
+repository, and drop `PWD`, so `/proc/<pid>/cmdline`, `cwd`, and `environ` of the
+harness do not point at the answer key. `run_python` cannot keep a change to the spec
+or the public test: both are restored after every snippet and the attempt is counted
+as a test write. `python3 ladder/run.py --mock probe` prints every process whose
+cmdline, cwd, or environ names the repository, as a submission would see it.
+
+What remains: the worker runs as the harness user and can read any file that user can
+and walk `/proc`. A shell that launched the harness from inside the repository, an
+editor with the tree open, or this very terminal session all name it, and the probe
+will list them. A model you do not trust belongs in a container, which is on the
+to-do list.
 
 ## Results, 2026-10-26
 

@@ -11,8 +11,10 @@ rebuilt at the end.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 from pathlib import Path
@@ -48,6 +50,7 @@ def main() -> int:
         print(__doc__)
         return 2
     host, models = argv[0], argv[1:]
+    os.chdir(tempfile.mkdtemp(prefix="ladder-sweep-"))
     for name in loaded(host):
         print(f"unloading {name} that was already resident", flush=True)
         unload(host, name)
@@ -67,4 +70,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    sys.path.insert(0, str(HERE))
+    import boot
+    boot.neutral_argv(__file__)
     raise SystemExit(main())

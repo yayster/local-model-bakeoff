@@ -235,4 +235,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    sys.path.insert(0, str(ROOT / "ladder"))
+    import boot
+    boot.neutral_argv(__file__)
     raise SystemExit(main())
