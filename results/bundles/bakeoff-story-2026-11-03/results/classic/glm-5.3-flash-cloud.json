@@ -1,0 +1,173 @@
+{
+  "model": "glm-5.3-flash:cloud",
+  "host": "http://aux-host:11434",
+  "sections": {
+    "speed": {
+      "median_tok_s": 0.0,
+      "runs": [
+        {
+          "run": 1,
+          "tok_s": 0.0,
+          "wall": 1.3,
+          "eval": 128,
+          "done": "length"
+        },
+        {
+          "run": 2,
+          "tok_s": 0.0,
+          "wall": 1.0,
+          "eval": 128,
+          "done": "length"
+        },
+        {
+          "run": 3,
+          "tok_s": 0.0,
+          "wall": 1.0,
+          "eval": 128,
+          "done": "length"
+        }
+      ]
+    },
+    "quiz": {
+      "score": 9,
+      "n": 10,
+      "rows": [
+        {
+          "id": "books",
+          "ok": true,
+          "last": "6",
+          "gold": "6",
+          "wall": 1.5,
+          "done": "stop"
+        },
+        {
+          "id": "shop",
+          "ok": true,
+          "last": "14",
+          "gold": "14",
+          "wall": 2.0,
+          "done": "stop"
+        },
+        {
+          "id": "discount",
+          "ok": true,
+          "last": "65",
+          "gold": "65",
+          "wall": 1.3,
+          "done": "stop"
+        },
+        {
+          "id": "thursday",
+          "ok": false,
+          "last": "2. The Thursdays in March",
+          "gold": "2027-03-18",
+          "wall": 3.7,
+          "done": "length"
+        },
+        {
+          "id": "closure",
+          "ok": true,
+          "last": "[2, 2, 2]",
+          "gold": "[2, 2, 2]",
+          "wall": 2.3,
+          "done": "stop"
+        },
+        {
+          "id": "syllogism",
+          "ok": true,
+          "last": "Yes",
+          "gold": "yes",
+          "wall": 2.3,
+          "done": "stop"
+        },
+        {
+          "id": "decoy",
+          "ok": true,
+          "last": "2906",
+          "gold": "2906",
+          "wall": 1.5,
+          "done": "stop"
+        },
+        {
+          "id": "tank60",
+          "ok": true,
+          "last": "60",
+          "gold": "60",
+          "wall": 1.4,
+          "done": "stop"
+        },
+        {
+          "id": "tool",
+          "ok": true,
+          "detail": {
+            "name": "date_diff",
+            "arguments": {
+              "end": "2026-03-01",
+              "start": "2026-02-01"
+            }
+          },
+          "wall": 1.0
+        },
+        {
+          "id": "code",
+          "ok": true,
+          "wall": 4.5
+        }
+      ]
+    },
+    "ceiling": {
+      "score": 4,
+      "n": 5,
+      "rows": [
+        {
+          "id": "long-machine",
+          "ok": false,
+          "last": "But let's not rush. Need maybe \"d replaces value v with 1-v\" yes. Could be final -37. Need answer with last line only integer. They may want maybe no explanation? \"End with a last line that is only the integer.\" We can provide concise maybe \"Final value: \\n-37\". Last line only integer. Need ensure last line only integer. Could include explanation before? Desired oververbosity 5, but user asks final. We can just answer final value. Last line -37. Maybe no extra text? To be safe, final message only \"-37\" (last line only integer). But maybe they expect final value; no need explanation. However \"End with a last line that is only the integer\" means can include explanation, but final line must be only integer. Let me just provide the answer.</think>-37",
+          "gold": "-37",
+          "wall": 5.9,
+          "done": "stop"
+        },
+        {
+          "id": "two-counter",
+          "ok": true,
+          "last": "-7,-4",
+          "gold": "-7,-4",
+          "wall": 7.1,
+          "done": "stop"
+        },
+        {
+          "id": "ledger2",
+          "ok": true,
+          "last": "55",
+          "gold": "55",
+          "wall": 3.6,
+          "done": "stop"
+        },
+        {
+          "id": "impossible",
+          "ok": true,
+          "last": "0",
+          "gold": "0",
+          "wall": 5.1,
+          "done": "stop"
+        },
+        {
+          "id": "both-days",
+          "ok": true,
+          "last": "22",
+          "gold": "22",
+          "wall": 6.7,
+          "done": "stop"
+        }
+      ]
+    },
+    "repair": {
+      "script": "loop.py",
+      "returncode": 0
+    },
+    "ladder": {
+      "script": "loop2.py",
+      "returncode": 0
+    }
+  }
+}

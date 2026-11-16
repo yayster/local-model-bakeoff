@@ -14,6 +14,9 @@ from pathlib import Path
 import loop
 
 MAX_TURNS = 6
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ladder"))
+import v1chat  # noqa: E402
+
 HOST = None
 MODEL = None
 
@@ -365,6 +368,11 @@ def grade(task, files) -> dict:
 
 
 def chat(messages):
+    if v1chat.is_v1(HOST):
+        t0 = time.perf_counter()
+        data = v1chat.chat(HOST, MODEL, messages, 2400, tools=loop.TOOLS, think=False, timeout=300)
+        msg = data.get("message") or {}
+        return msg, round(time.perf_counter() - t0, 2)
     body = {
         "model": MODEL,
         "stream": False,

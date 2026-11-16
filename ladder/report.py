@@ -65,30 +65,30 @@ def render(reports: list[dict]) -> str:
     hashes = sorted({d["ladder_hash"] for d in reports})
     lines.append(f"Ladder hash {', '.join(hashes)}. " + ("Runs with different hashes ran different ladders." if len(hashes) > 1 else ""))
     lines.append("")
-    lines.append("| Model | Passed | Gain | Height | Peak | Median turns | Tokens | Minutes | Red stops | GPU |")
-    lines.append("|---|---|---|---|---|---|---|---|---|---|")
+    lines.append("| Model | Hash | Passed | Gain | Height | Peak | Median turns | Tokens | Minutes | Red stops | GPU |")
+    lines.append("|---|---|---|---|---|---|---|---|---|---|---|")
     for d in reports:
         s = d["score"]
         loaded = (d.get("seat_after") or {}).get("loaded") or {}
         gpu = f"{loaded['gpu_percent']}%" if loaded.get("gpu_percent") is not None else "-"
         turns = s.get("median_turns_on_pass")
         lines.append(
-            f"| {d['model']} | {s['passed']}/{s['n']} | {s.get('gain', 0):.0%} | {s['height']}/{s['n']} | {s.get('peak', 0)} | "
+            f"| {d['model']} | {d['ladder_hash'][:4]} | {s['passed']}/{s['n']} | {s.get('gain', 0):.0%} | {s['height']}/{s['n']} | {s.get('peak', 0)} | "
             f"{turns if turns is not None else '-'} | {s['eval_tokens']} | {s['seconds'] / 60:.1f} | "
             f"{s.get('stopped_red', 0)} | {gpu} |")
     lines.append("")
     lines.append("Passed is rungs whose hidden tests all pass. Gain is hidden cases passed above the cases that already pass on the untouched bug. Height is the highest rung with every rung below it also passed; peak is the highest rung passed at all.")
     lines.append("")
-    header = "| Model | " + " | ".join(f"{i + 1} {rid}" for i, rid in enumerate(rung_ids)) + " |"
+    header = "| Model | Hash | " + " | ".join(f"{i + 1} {rid}" for i, rid in enumerate(rung_ids)) + " |"
     lines.append(header)
-    lines.append("|---|" + "---|" * len(rung_ids))
+    lines.append("|---|---|" + "---|" * len(rung_ids))
     for d in reports:
         by_rung: dict = {}
         for run in d["runs"]:
             for r in run["rows"]:
                 by_rung.setdefault(r["id"], []).append(r)
         cells = [rung_cell(by_rung[rid]) if rid in by_rung else "-" for rid in rung_ids]
-        lines.append(f"| {d['model']} | " + " | ".join(cells) + " |")
+        lines.append(f"| {d['model']} | {d['ladder_hash'][:4]} | " + " | ".join(cells) + " |")
     lines.append("")
     lines.append("Cell legend: `pass`, or repeats passed and the best hidden-case count; `turns` ran out of turns; `length` a reply hit the generation cap; `red` stopped with public tests failing; `wrote-tests` tried to edit a test; `malformed` a tool call the server could not parse; `err` a request failed.")
     lines.append("")

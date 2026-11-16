@@ -16,6 +16,9 @@ import time
 import urllib.request
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ladder"))
+import v1chat  # noqa: E402
+
 HOST = None
 MODEL = None
 MAX_TURNS = 5
@@ -451,6 +454,11 @@ def dispatch(wd: Path, name: str, args: dict) -> str:
 
 
 def chat(messages):
+    if v1chat.is_v1(HOST):
+        t0 = time.perf_counter()
+        data = v1chat.chat(HOST, MODEL, messages, 1800, tools=TOOLS, think=False, timeout=300)
+        msg = data.get("message") or {}
+        return msg, round(time.perf_counter() - t0, 2), data.get("eval_count"), data.get("done_reason")
     body = {
         "model": MODEL,
         "stream": False,

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Climb the ladder with several models on one host, one at a time.
 
-    python3 ladder/sweep.py http://abzu:11434 qwen3.8:27b flint:40b ornith-1.5:35b laguna-xs-2.1:q4_K_M
+    python3 ladder/sweep.py http://gpu-host:11434 qwen3.8:27b flint:40b ornith-1.5:35b laguna-xs-2.1:q4_K_M
 
 Each model is unloaded after its climb so the next one gets the whole GPU and the
 seat stays comparable. Extra arguments after `--` go to run.py. The report is

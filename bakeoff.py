@@ -18,6 +18,8 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT / "ladder"))
+import v1chat  # noqa: E402
 QUIZ = json.loads((ROOT / "tasks" / "quiz.json").read_text())
 CEILING = json.loads((ROOT / "tasks" / "ceiling.json").read_text())
 
@@ -47,6 +49,8 @@ CODE_CASES = [
 
 
 def chat(host: str, model: str, messages: list, num_predict: int, tools=None) -> dict:
+    if v1chat.is_v1(host):
+        return v1chat.chat(host, model, messages, num_predict, tools=tools, think=False, timeout=400)
     payload = {
         "model": model,
         "messages": messages,

@@ -3118,7 +3118,8 @@ rung(
             self.assertEqual(count_in_ranges([], [(0, 1)]), [0])
     """),
     tests("""
-    import hashlib, json, random, time
+    import hashlib, json, random
+    import ladder_clock
     from mod import count_in_ranges
     class T(unittest.TestCase):
         def test_small(self):
@@ -3140,9 +3141,8 @@ rung(
             for _ in range(n):
                 a, b = rng.randint(0, 10 ** 6), rng.randint(0, 10 ** 6)
                 ranges.append((min(a, b), max(a, b)))
-            t0 = time.perf_counter()
             got = count_in_ranges(points, ranges)
-            elapsed = time.perf_counter() - t0
+            elapsed = ladder_clock.last_call_seconds()
             self.assertEqual(len(got), n)
             for i in range(0, n, n // 10):
                 lo, hi = ranges[i]

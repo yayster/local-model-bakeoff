@@ -1,0 +1,11 @@
+5c77ed7 Ladder v2: grade in two processes; the worker never sees the test source or the verdict pipe.
+d73bb5f Ladder v2: address PR review; isolate grading, contain run_python, tighten ranges.
+e0811a7 Record glm-5.3-flash:cloud results: 16/16 on the ladder, with the reasoning-leak caveat.
+c9735bb Ladder v2 harness: a length-capped reply with no tool call costs a turn, not the rung.
+2311952 Add TODO: salesbot eval with injection, spam, and internal-info cases; ladder v3 reorder.
+3d7fc5c Ladder v2: fold repeats in the report; record the 2026-10-26 five-model results.
+2cfb4aa Ladder v2 harness: retry server errors, nudge on malformed tool calls, record length stops.
+5d7722f Ladder v2: add expr, undo, and reconcile rungs; raise the ceiling to 16.
+6310b92 Add ladder/sweep.py: climb with several models in turn, unloading between.
+162852e Add ladder v2: thirteen agentic repair rungs with traps and a self-check.
+8886252 Add the 2026-10-25 local model bake-off suite.

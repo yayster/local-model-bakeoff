@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import harness  # noqa: E402
 import rungs as rung_defs  # noqa: E402
+import v1chat  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 LADDER_VERSION = "2026-10-26c"
@@ -63,10 +64,11 @@ def user_prompt(rung: dict, total: int) -> str:
 
 # ----------------------------------------------------------------------------- clients
 
-class MalformedToolCall(Exception):
+class MalformedToolCall(v1chat.MalformedToolCall):
     """The model produced a tool call the server could not parse. Ollama 0.40 reports
     this as HTTP 500 with "invalid tool call arguments" instead of returning the
-    message, so the harness turns it into a bad tool call and lets the model retry."""
+    message, so the harness turns it into a bad tool call and lets the model retry.
+    On /v1 the arguments arrive as a string and v1chat raises its base class."""
 
 
 class OllamaClient:
@@ -115,6 +117,8 @@ class OllamaClient:
                 if exc.code < 500:
                     raise
                 last = exc
+            except v1chat.MalformedToolCall as exc:
+                raise MalformedToolCall(str(exc)) from None
             except (urllib.error.URLError, ConnectionError, TimeoutError) as exc:
                 last = exc
             print(f"  retry {attempt + 1} after {type(last).__name__}: {str(last)[:80]}", flush=True)
@@ -175,6 +179,32 @@ class OllamaClient:
             "think": self.think, "num_ctx": self.num_ctx, "num_predict": self.num_predict,
             "seed": self.seed, "temperature": 0,
         }
+
+
+class V1Client(OllamaClient):
+    """The same protocol on an OpenAI-compatible /v1 endpoint such as llama-server.
+    The host's context window is the seat; num_ctx cannot be set per request."""
+
+    def _chat_once(self, messages: list) -> tuple[dict, dict]:
+        data = v1chat.chat(self.host, self.model, messages, self.num_predict, tools=harness.TOOLS,
+                           think=self.think, seed=self.seed, timeout=self.timeout, num_ctx=self.num_ctx)
+        msg = data["message"]
+        meta = {
+            "wall": round(data["_wall"], 2),
+            "thinking_chars": len(msg.get("thinking") or ""),
+            "content_chars": len(msg.get("content") or ""),
+            "prompt_eval_count": data.get("prompt_eval_count"),
+            "eval_count": data.get("eval_count"),
+            "eval_duration": data.get("eval_duration"),
+            "done_reason": data.get("done_reason"),
+        }
+        return msg, meta
+
+    def seat(self) -> dict:
+        info = v1chat.seat(self.host, self.model)
+        info.update({"think": self.think, "num_ctx": self.num_ctx, "num_predict": self.num_predict,
+                     "seed": self.seed, "temperature": 0})
+        return info
 
 
 PROBE = r"""
@@ -266,6 +296,30 @@ class MockClient:
 
     def seat(self) -> dict:
         return {"host": "mock", "model": self.model}
+
+
+def archive_previous(out_dir: Path, safe: str) -> None:
+    """A result file is named by model, so a second climb of the same tag would
+    overwrite the first. Move an existing result and its transcripts aside under
+    their own ladder hash and date first; report.py then shows both, by hash."""
+    path = out_dir / f"{safe}.json"
+    if not path.is_file():
+        return
+    try:
+        old = json.loads(path.read_text())
+        label = f"{str(old.get('ladder_hash') or 'nohash')[:4]}-{str(old.get('started') or '')[:10].replace('-', '') or 'nodate'}"
+    except (json.JSONDecodeError, OSError):
+        label = "unknown"
+    dest = out_dir / f"{safe}-{label}.json"
+    n = 1
+    while dest.exists():
+        n += 1
+        dest = out_dir / f"{safe}-{label}-{n}.json"
+    path.rename(dest)
+    tdir = out_dir / safe
+    if tdir.is_dir():
+        tdir.rename(out_dir / dest.stem)
+    print(f"archived the previous result as {dest.name}", flush=True)
 
 
 # ----------------------------------------------------------------------------- loop
@@ -561,12 +615,14 @@ def main() -> int:
     else:
         if not (args.host and args.model):
             ap.error("host and model are required unless --check or --mock is given")
-        client = OllamaClient(args.host, args.model, args.num_predict, args.timeout,
+        client = (V1Client if v1chat.is_v1(args.host) else OllamaClient)(args.host, args.model, args.num_predict, args.timeout,
                               args.keep_alive, args.think, args.num_ctx, args.seed)
     total = len(rung_defs.RUNGS)
     safe = client.model.replace(":", "-").replace("/", "-") + (f"-{args.tag}" if args.tag else "")
     out_dir = ROOT / "results" / "ladder"
     out_dir.mkdir(parents=True, exist_ok=True)
+    if not isinstance(client, MockClient):
+        archive_previous(out_dir, safe)
     transcripts = None if args.no_transcripts else out_dir / safe
     seat_before = client.seat()
     runs = []

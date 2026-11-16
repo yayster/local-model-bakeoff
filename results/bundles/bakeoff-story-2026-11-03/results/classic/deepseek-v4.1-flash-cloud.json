@@ -1,0 +1,173 @@
+{
+  "model": "deepseek-v4.1-flash:cloud",
+  "host": "http://aux-host:11434",
+  "sections": {
+    "speed": {
+      "median_tok_s": 0.0,
+      "runs": [
+        {
+          "run": 1,
+          "tok_s": 0.0,
+          "wall": 0.5,
+          "eval": 128,
+          "done": "length"
+        },
+        {
+          "run": 2,
+          "tok_s": 0.0,
+          "wall": 0.5,
+          "eval": 128,
+          "done": "length"
+        },
+        {
+          "run": 3,
+          "tok_s": 0.0,
+          "wall": 0.6,
+          "eval": 128,
+          "done": "length"
+        }
+      ]
+    },
+    "quiz": {
+      "score": 6,
+      "n": 10,
+      "rows": [
+        {
+          "id": "books",
+          "ok": false,
+          "last": "**6**",
+          "gold": "6",
+          "wall": 0.7,
+          "done": "stop"
+        },
+        {
+          "id": "shop",
+          "ok": true,
+          "last": "14",
+          "gold": "14",
+          "wall": 0.8,
+          "done": "stop"
+        },
+        {
+          "id": "discount",
+          "ok": false,
+          "last": "```",
+          "gold": "65",
+          "wall": 0.6,
+          "done": "stop"
+        },
+        {
+          "id": "thursday",
+          "ok": true,
+          "last": "2027-03-18",
+          "gold": "2027-03-18",
+          "wall": 0.8,
+          "done": "stop"
+        },
+        {
+          "id": "closure",
+          "ok": false,
+          "last": "```",
+          "gold": "[2, 2, 2]",
+          "wall": 1.0,
+          "done": "stop"
+        },
+        {
+          "id": "syllogism",
+          "ok": true,
+          "last": "yes",
+          "gold": "yes",
+          "wall": 0.4,
+          "done": "stop"
+        },
+        {
+          "id": "decoy",
+          "ok": true,
+          "last": "2906",
+          "gold": "2906",
+          "wall": 0.4,
+          "done": "stop"
+        },
+        {
+          "id": "tank60",
+          "ok": false,
+          "last": "**60**",
+          "gold": "60",
+          "wall": 0.6,
+          "done": "stop"
+        },
+        {
+          "id": "tool",
+          "ok": true,
+          "detail": {
+            "name": "date_diff",
+            "arguments": {
+              "start": "2026-02-01",
+              "end": "2026-03-01"
+            }
+          },
+          "wall": 0.4
+        },
+        {
+          "id": "code",
+          "ok": true,
+          "wall": 1.3
+        }
+      ]
+    },
+    "ceiling": {
+      "score": 5,
+      "n": 5,
+      "rows": [
+        {
+          "id": "long-machine",
+          "ok": true,
+          "last": "-37",
+          "gold": "-37",
+          "wall": 2.4,
+          "done": "stop"
+        },
+        {
+          "id": "two-counter",
+          "ok": true,
+          "last": "-7,-4",
+          "gold": "-7,-4",
+          "wall": 2.2,
+          "done": "stop"
+        },
+        {
+          "id": "ledger2",
+          "ok": true,
+          "last": "55",
+          "gold": "55",
+          "wall": 1.6,
+          "done": "stop"
+        },
+        {
+          "id": "impossible",
+          "ok": true,
+          "last": "0",
+          "gold": "0",
+          "wall": 3.9,
+          "done": "stop"
+        },
+        {
+          "id": "both-days",
+          "ok": true,
+          "last": "22",
+          "gold": "22",
+          "wall": 2.6,
+          "done": "stop"
+        }
+      ]
+    },
+    "repair": {
+      "script": "loop.py",
+      "returncode": 0
+    },
+    "ladder": {
+      "script": "loop2.py",
+      "returncode": 0
+    }
+  }
+}

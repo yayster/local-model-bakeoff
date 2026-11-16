@@ -1,0 +1,417 @@
+{
+  "model": "qwen3.8:27b",
+  "passed": 8,
+  "n": 8,
+  "rows": [
+    {
+      "id": "chunks",
+      "turns": 4,
+      "seconds": 10.55,
+      "public": true,
+      "hidden": true,
+      "hidden_tail": "...\n----------------------------------------------------------------------\nRan 3 tests in 0.000s\n\nOK",
+      "trace": [
+        {
+          "n": 1,
+          "seconds": 2.9,
+          "eval": 52,
+          "reason": "stop",
+          "tools": [
+            "read_file",
+            "read_file"
+          ],
+          "content": ""
+        },
+        {
+          "n": 2,
+          "seconds": 3.66,
+          "eval": 82,
+          "reason": "stop",
+          "tools": [
+            "write_file"
+          ],
+          "content": ""
+        },
+        {
+          "n": 3,
+          "seconds": 0.76,
+          "eval": 15,
+          "reason": "stop",
+          "tools": [
+            "run_tests"
+          ],
+          "content": ""
+        },
+        {
+          "n": 4,
+          "seconds": 3.06,
+          "eval": 70,
+          "reason": "stop",
+          "tools": [],
+          "content": "Fixed. The bug was the loop condition `i + n <= len(xs)`, which skipped the final partial chunk (e.g. `[5]` in `chunks([1,2,3,4,5], 2)`). Changed it to `i < len(xs)` so the last shorter chunk is inclu"
+        }
+      ],
+      "public_was_green": true
+    },
+    {
+      "id": "median",
+      "turns": 4,
+      "seconds": 10.44,
+      "public": true,
+      "hidden": true,
+      "hidden_tail": ".\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nOK",
+      "trace": [
+        {
+          "n": 1,
+          "seconds": 2.73,
+          "eval": 52,
+          "reason": "stop",
+          "tools": [
+            "read_file",
+            "read_file"
+          ],
+          "content": ""
+        },
+        {
+          "n": 2,
+          "seconds": 4.42,
+          "eval": 101,
+          "reason": "stop",
+          "tools": [
+            "write_file"
+          ],
+          "content": ""
+        },
+        {
+          "n": 3,
+          "seconds": 0.75,
+          "eval": 15,
+          "reason": "stop",
+          "tools": [
+            "run_tests"
+          ],
+          "content": ""
+        },
+        {
+          "n": 4,
+          "seconds": 2.35,
+          "eval": 53,
+          "reason": "stop",
+          "tools": [],
+          "content": "Fixed. `median` now handles even counts by averaging the two middle values (e.g., `median([1,2,3,4])` \u2192 2.5) while odd counts still return the middle value as a float. Tests pass."
+        }
+      ],
+      "public_was_green": true
+    },
+    {
+      "id": "second",
+      "turns": 4,
+      "seconds": 9.23,
+      "public": true,
+      "hidden": true,
+      "hidden_tail": "..\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nOK",
+      "trace": [
+        {
+          "n": 1,
+          "seconds": 2.66,
+          "eval": 52,
+          "reason": "stop",
+          "tools": [
+            "read_file",
+            "read_file"
+          ],
+          "content": ""
+        },
+        {
+          "n": 2,
+          "seconds": 3.83,
+          "eval": 86,
+          "reason": "stop",
+          "tools": [
+            "write_file"
+          ],
+          "content": ""
+        },
+        {
+          "n": 3,
+          "seconds": 0.76,
+          "eval": 15,
+          "reason": "stop",
+          "tools": [
+            "run_tests"
+          ],
+          "content": ""
+        },
+        {
+          "n": 4,
+          "seconds": 1.81,
+          "eval": 40,
+          "reason": "stop",
+          "tools": [],
+          "content": "Fixed. `second_largest` now finds the max, filters out all values equal to it, and returns the max of the remainder (or `None` if nothing remains). Tests pass."
+        }
+      ],
+      "public_was_green": true
+    },
+    {
+      "id": "holiday",
+      "turns": 4,
+      "seconds": 13.27,
+      "public": true,
+      "hidden": true,
+      "hidden_tail": "..\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nOK",
+      "trace": [
+        {
+          "n": 1,
+          "seconds": 2.8,
+          "eval": 52,
+          "reason": "stop",
+          "tools": [
+            "read_file",
+            "read_file"
+          ],
+          "content": ""
+        },
+        {
+          "n": 2,
+          "seconds": 5.16,
+          "eval": 116,
+          "reason": "stop",
+          "tools": [
+            "write_file"
+          ],
+          "content": ""
+        },
+        {
+          "n": 3,
+          "seconds": 0.76,
+          "eval": 15,
+          "reason": "stop",
+          "tools": [
+            "run_tests"
+          ],
+          "content": ""
+        },
+        {
+          "n": 4,
+          "seconds": 4.37,
+          "eval": 101,
+          "reason": "stop",
+          "tools": [],
+          "content": "Fixed. The bug was that `holidays` was ignored \u2014 the loop only skipped weekends. Now it also skips any date whose ISO string is in the `holidays` set, so `add_business_days('2026-11-25', 1, {'2026-11-"
+        }
+      ],
+      "public_was_green": true
+    },
+    {
+      "id": "duration",
+      "turns": 4,
+      "seconds": 12.97,
+      "public": true,
+      "hidden": true,
+      "hidden_tail": ".\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nOK",
+      "trace": [
+        {
+          "n": 1,
+          "seconds": 2.7,
+          "eval": 52,
+          "reason": "stop",
+          "tools": [
+            "read_file",
+            "read_file"
+          ],
+          "content": ""
+        },
+        {
+          "n": 2,
+          "seconds": 5.69,
+          "eval": 130,
+          "reason": "stop",
+          "tools": [
+            "write_file"
+          ],
+          "content": ""
+        },
+        {
+          "n": 3,
+          "seconds": 0.75,
+          "eval": 15,
+          "reason": "stop",
+          "tools": [
+            "run_tests"
+          ],
+          "content": ""
+        },
+        {
+          "n": 4,
+          "seconds": 3.64,
+          "eval": 84,
+          "reason": "stop",
+          "tools": [],
+          "content": "Fixed. The bug was that `parse_duration` returned only `hours * 60`, dropping the minutes. Now it returns `hours * 60 + minutes`, so `'1h20m'` \u2192 80, `'45m'` \u2192 45, `'2h'` \u2192 120, `'0m'` \u2192 0. Tests pass."
+        }
+      ],
+      "public_was_green": false
+    },
+    {
+      "id": "ledger",
+      "turns": 4,
+      "seconds": 10.74,
+      "public": true,
+      "hidden": true,
+      "hidden_tail": ".\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nOK",
+      "trace": [
+        {
+          "n": 1,
+          "seconds": 2.75,
+          "eval": 52,
+          "reason": "stop",
+          "tools": [
+            "read_file",
+            "read_file"
+          ],
+          "content": ""
+        },
+        {
+          "n": 2,
+          "seconds": 4.29,
+          "eval": 97,
+          "reason": "stop",
+          "tools": [
+            "write_file"
+          ],
+          "content": ""
+        },
+        {
+          "n": 3,
+          "seconds": 0.75,
+          "eval": 15,
+          "reason": "stop",
+          "tools": [
+            "run_tests"
+          ],
+          "content": ""
+        },
+        {
+          "n": 4,
+          "seconds": 2.77,
+          "eval": 63,
+          "reason": "stop",
+          "tools": [],
+          "content": "Fixed. `apply_ledger` now:\n- Applies positive values (deposits) unconditionally.\n- Applies negative values only when the balance stays \u2265 0.\n- Otherwise rejects the transaction and subtracts a fee of 5"
+        }
+      ],
+      "public_was_green": false
+    },
+    {
+      "id": "discount",
+      "turns": 4,
+      "seconds": 9.91,
+      "public": true,
+      "hidden": true,
+      "hidden_tail": "..\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nOK",
+      "trace": [
+        {
+          "n": 1,
+          "seconds": 2.78,
+          "eval": 52,
+          "reason": "stop",
+          "tools": [
+            "read_file",
+            "read_file"
+          ],
+          "content": ""
+        },
+        {
+          "n": 2,
+          "seconds": 4.71,
+          "eval": 107,
+          "reason": "stop",
+          "tools": [
+            "write_file"
+          ],
+          "content": ""
+        },
+        {
+          "n": 3,
+          "seconds": 0.76,
+          "eval": 15,
+          "reason": "stop",
+          "tools": [
+            "run_tests"
+          ],
+          "content": ""
+        },
+        {
+          "n": 4,
+          "seconds": 1.48,
+          "eval": 32,
+          "reason": "stop",
+          "tools": [],
+          "content": "Fixed. `discount_total` now applies the 10% discount only to rows with qty \u2265 3, and full price otherwise. Tests pass."
+        }
+      ],
+      "public_was_green": false
+    },
+    {
+      "id": "garage",
+      "turns": 5,
+      "seconds": 24.51,
+      "public": true,
+      "hidden": true,
+      "hidden_tail": ".\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nOK",
+      "trace": [
+        {
+          "n": 1,
+          "seconds": 2.79,
+          "eval": 52,
+          "reason": "stop",
+          "tools": [
+            "read_file",
+            "read_file"
+          ],
+          "content": ""
+        },
+        {
+          "n": 2,
+          "seconds": 1.52,
+          "eval": 27,
+          "reason": "stop",
+          "tools": [
+            "read_file"
+          ],
+          "content": ""
+        },
+        {
+          "n": 3,
+          "seconds": 9.38,
+          "eval": 220,
+          "reason": "stop",
+          "tools": [
+            "write_file"
+          ],
+          "content": ""
+        },
+        {
+          "n": 4,
+          "seconds": 0.76,
+          "eval": 15,
+          "reason": "stop",
+          "tools": [
+            "run_tests"
+          ],
+          "content": ""
+        },
+        {
+          "n": 5,
+          "seconds": 9.88,
+          "eval": 232,
+          "reason": "stop",
+          "tools": [],
+          "content": "Fixed. The bug was that the old code returned 0 whenever `end <= start`, so overnight stays (e.g. `'22:00'` \u2192 `'03:30'`) were never charged.\n\nThe new implementation:\n- Returns 0 when the times are equ"
+        }
+      ],
+      "public_was_green": false
+    }
+  ]
+}
