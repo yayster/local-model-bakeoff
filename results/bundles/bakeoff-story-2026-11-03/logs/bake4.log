@@ -1,0 +1,19 @@
+######## ladder2 qwen3.8:27b 16:51:14
+######## ladder2 qwen3.8:27b exit 0 17:38:36
+######## classic qwen3.8:27b 17:38:36
+######## classic qwen3.8:27b exit 0 17:51:49
+######## restoring house model 17:51:49
+  Environment="LLAMA_POOL_MODEL=<ollama-models>/blobs/sha256-4c5e2db039e9325ac7724c8846c71356a24ad1cdfa28002d73ecb6be645f9675"
+  Environment="LLAMA_POOL_EXTRA_ARGS=--mmproj <ollama-models>/blobs/sha256-5ac423f8a29059dc24e51bc6a43e9380dcd57a9347f28b62591e0b3f60b7081c"
+live:       qwen3.8-u:27b n_ctx=131072
+
+=== verify (mode: local) ===
+  llama-pool.service     GPU 23874 MiB
+  comfyui-gpu0.service   GPU     0 MiB
+  comfyui-gpu1.service   GPU     0 MiB
+  comfyui.service        GPU     0 MiB
+  :11434 serves qwen3.8-u:27b
+  :8188 reachable
+[seat-mode] verify PASS
+######## restore exit 0 17:51:59
+######## all done 17:51:59

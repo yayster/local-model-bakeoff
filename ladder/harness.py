@@ -175,7 +175,8 @@ def dec(e, mk):
 # call, new, method, and getattr requests, one JSON line each. Anything the
 # submission prints goes to stderr so it cannot touch the protocol stream.
 WORKER_BODY = r'''
-import sys, importlib, builtins
+import sys, importlib, builtins, time as _time
+_clock = _time.perf_counter  # bound before the submission loads, so it cannot be patched
 _out = sys.stdout
 sys.stdout = sys.stderr
 
@@ -241,20 +242,24 @@ for line in sys.stdin:
         else:
             target = getattr(importlib.import_module(req["module"]), req["name"])
         before = _json.dumps(enc(args, H))
+        t0 = _clock()
         try:
             value = target(*args, **kwargs)
         except KeyboardInterrupt:
             raise
         except BaseException as exc:
+            secs = _clock() - t0
             after = _json.dumps(enc(args, H))
-            send({"ok": False, "exc": exc_record(exc), "args": None if after == before else _json.loads(after)})
+            send({"ok": False, "exc": exc_record(exc), "secs": secs,
+                  "args": None if after == before else _json.loads(after)})
             continue
+        secs = _clock() - t0
         after = _json.dumps(enc(args, H))
         if op == "new":
             out = [_H, H.put(value), type(value).__name__]
         else:
             out = enc(value, H)
-        send({"ok": True, "value": out, "args": None if after == before else _json.loads(after)})
+        send({"ok": True, "value": out, "secs": secs, "args": None if after == before else _json.loads(after)})
     except KeyboardInterrupt:
         raise
     except BaseException as exc:
@@ -336,8 +341,11 @@ def make_exc(rec):
             return cls(rec.get("msg", ""))
     return RuntimeError(rec.get("msg", ""))
 
+LAST = {"secs": None}
+
 def invoke(req, args):
     resp = rpc(req)
+    LAST["secs"] = resp.get("secs")
     if resp.get("args") is not None:
         for old, fresh in zip(args, dec(resp["args"], mkp)):
             sync(old, fresh)
@@ -384,6 +392,14 @@ class Finder(importlib.abc.MetaPathFinder, importlib.abc.Loader):
         pass
 
 sys.meta_path.insert(0, Finder())
+
+# ladder_clock.last_call_seconds() is how a hidden test times the submission: the
+# seconds the worker spent inside the most recent proxied call, measured by a clock
+# bound before the submission loaded. It leaves out the protocol's own cost, which
+# on 100k-entry arguments is most of a wall-clock measurement taken here.
+clock_mod = types.ModuleType("ladder_clock")
+clock_mod.last_call_seconds = lambda: LAST["secs"]
+sys.modules["ladder_clock"] = clock_mod
 
 def emit(payload, code):
     try:

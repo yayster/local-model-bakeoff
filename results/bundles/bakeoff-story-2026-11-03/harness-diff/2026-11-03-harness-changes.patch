@@ -1,0 +1,496 @@
+diff --git a/README.md b/README.md
+index 3d34508..fdb2803 100644
+--- a/README.md
++++ b/README.md
+@@ -3,6 +3,11 @@
+ The suite behind the 2026-10-25 comparison of `qwen3.8:27b`, `flint:40b`, `ornith-1.5:35b`, and `laguna-xs-2.1:q4_K_M` on a machine with two 16 GB GPUs.
+ 
+ It talks to Ollama's `/api/chat`. Point it at any Ollama that has the tag pulled.
++A host whose path ends in `/v1` (for example `http://gpu-host:11434/v1`) is treated as an
++OpenAI-compatible endpoint instead, such as llama.cpp's `llama-server`; `ladder/v1chat.py`
++maps the protocol both ways, so every section and the ladder run unchanged. On `/v1`
++thinking is turned off through the chat template, `num_ctx` is the server's setting,
++and speed comes from the server's `timings`.
+ 
+ ## Run
+ 
+diff --git a/bakeoff.py b/bakeoff.py
+index 5b38a05..42212b3 100644
+--- a/bakeoff.py
++++ b/bakeoff.py
+@@ -18,6 +18,8 @@ import urllib.request
+ from pathlib import Path
+ 
+ ROOT = Path(__file__).resolve().parent
++sys.path.insert(0, str(ROOT / "ladder"))
++import v1chat  # noqa: E402
+ QUIZ = json.loads((ROOT / "tasks" / "quiz.json").read_text())
+ CEILING = json.loads((ROOT / "tasks" / "ceiling.json").read_text())
+ 
+@@ -47,6 +49,8 @@ CODE_CASES = [
+ 
+ 
+ def chat(host: str, model: str, messages: list, num_predict: int, tools=None) -> dict:
++    if v1chat.is_v1(host):
++        return v1chat.chat(host, model, messages, num_predict, tools=tools, think=False, timeout=400)
+     payload = {
+         "model": model,
+         "messages": messages,
+diff --git a/ladder/README.md b/ladder/README.md
+index cbb4e65..fe2c75c 100644
+--- a/ladder/README.md
++++ b/ladder/README.md
+@@ -11,6 +11,7 @@ python3 ladder/run.py --check                                   # validate the l
+ python3 ladder/run.py http://aux-host:11434 ornith-1.5:9b         # full climb, 3 minutes for a 27B, 20 for a 9B
+ python3 ladder/run.py http://aux-host:11434 ornith-1.5:9b --repeats 3   # the protocol for a ranking
+ python3 ladder/sweep.py http://gpu-host:11434 qwen3.8:27b flint:40b  # several models, one at a time, unloaded between
++python3 ladder/run.py http://gpu-host:11434/v1 qwen3.8-u:27b      # an OpenAI-compatible /v1 host, such as llama-server
+ python3 ladder/report.py                                        # table of every result file
+ python3 bakeoff.py http://aux-host:11434 ornith-1.5:9b --sections ladder2
+ ```
+@@ -144,7 +145,12 @@ Ladder hash `f344b4221dbe` at the time of these climbs, three repeats per model,
+ think off, temperature 0, seed 0, every model at 100% GPU. After review the ranges
+ rung now times the call against the spec's own 2 second limit and checks every count
+ through a digest, which changed the hash; every recorded ranges pass ran well under a
+-second, so these numbers stand, but a strict comparison with a new climb needs a rerun. The four large models ran on gpu-host (Ollama 0.40.11, context
++second, so these numbers stand, but a strict comparison with a new climb needs a rerun.
++Since 2026-11-03 that timing is taken inside the worker, by a clock bound before the
++submission loads, and reaches the test as `ladder_clock.last_call_seconds()`; under the
++two-process grader a wall clock in the assertion process had been counting the proxy's
++own cost on 100k-entry arguments, about 2 s for the gold, and the case had become a
++coin flip. The four large models ran on gpu-host (Ollama 0.40.11, context
+ 131072); the 9B ran on aux-host (Ollama 0.40.6, context 65536). Medians across repeats.
+ 
+ | Model | Passed | Gain | Height (min to max) | Median turns on a pass | Tokens | Minutes |
+@@ -166,6 +172,132 @@ On the classic sections the same leak cost it two format misses (quiz 9/10, ceil
+ 4/5) because the last line carried reasoning text; repair and the old ladder were
+ 8/8 and 8/8, and speed reads 0 because the cloud tag reports no decode duration.
+ 
++## Results, 2026-11-03: the two cloud tags
++
++Both are Ollama cloud-proxied tags run through aux-host (Ollama 0.40.6): no GPU seat,
++and the minutes measure the cloud service. Three repeats per model, think off,
++temperature 0, seed 0. Medians across repeats. The first pair of rows ran on hash
++`c5d23430e675`, the first two-process grader; the second pair on `117324ad4fa1`, after
++the rung 15 fix described below. The result files for the first pair carry a `-c5d2`
++suffix and `report.py` shows a hash column so the two never fold into one row.
++
++| Model | Hash | Passed | Gain | Height (min to max) | Median turns on a pass | Tokens | Minutes |
++|---|---|---|---|---|---|---|---|
++| glm-5.3-flash:cloud | c5d2 | 16/16 | 100% | 16 (16 to 16) | 6 | 38k | 4.6 |
++| deepseek-v4.1-flash:cloud | c5d2 | 15/16 | 98% | 11 (11 to 11) | 5 | 11k | 1.0 |
++| glm-5.3-flash:cloud | 1173 | 16/16 | 100% | 16 (16 to 16) | 6 | 36k | 4.2 |
++| deepseek-v4.1-flash:cloud | 1173 | 15/16 | 98% | 11 (11 to 11) | 5 | 11k | 1.0 |
++
++Classic sections, same day: glm quiz 9/10, ceiling 4/5, repair 8/8, old ladder 8/8;
++deepseek quiz 6/10, ceiling 5/5, repair 8/8, old ladder 8/8. Speed reads 0 for both
++because the cloud tags report no decode duration.
++
++- **The ladder gap is one rung; the cost gap is three to four times.** deepseek
++  solves the rungs it solves in a fixed five-turn pattern (list, read, write, test,
++  stop), about 1,100 tokens per rung and a minute per climb. glm spends three and a
++  half times the tokens and four times the wall time for one more rung, and most of
++  that spend is the reasoning leak below. Read this as near-equal ladder results at
++  very different prices, not as a strong model and a weak one.
++- **Three repeats here are closer to one trial.** Both models produced the same fix
++  on every rung across all three climbs, so at temperature 0 the repeats measure one
++  behaviour three times. That is why the fix to rung 15 mattered: with the model's
++  side fixed, the only variance in the six climbs was the grader's clock.
++- **deepseek's one miss is expr, six for six.** Its parser maps `/` by zero to
++  ValueError but lets `0 ** -1` escape as Python's ZeroDivisionError; the
++  `test_errors` case catches it. The spec says division by zero raises ValueError and
++  that a negative exponent is allowed, so the catch is fair, but it is the subtlest
++  sentence on the ladder. Height 11 is not a route choice: height is the rung below
++  the first failure, and the first failure was rung 12 every time. Everything else,
++  including shlex and cron where every local model fell, passed three for three.
++- **Rung 15 was a coin flip on hash c5d2.** deepseek's third c5d2 climb missed
++  `test_large_is_fast` at 2.2 s with a fix byte-identical to its two passes. Under the
++  two-process grader the test's wall clock was counting the proxy's cost on the
++  100k-entry arguments: the six c5d2 climbs ran the hidden suite in 1.98 to 2.76 s and
++  `--mock gold` in 2.09 s against a 2 s limit. The worker now times each call with a
++  clock bound before the submission loads, and the test reads
++  `ladder_clock.last_call_seconds()`; the gold measures 0.23 s, the untouched bug
++  still times out, and both models passed rung 15 on all three 1173 climbs.
++- **Format, again.** deepseek's four quiz misses are two right values in bold and
++  two replies that ended on a closing code fence; harmless on the ladder, where the
++  harness reads tool calls, and exactly what breaks a strict parser downstream. glm's
++  ceiling miss is the same reasoning leak as in October, and it hit the 3000-token
++  cap before its first tool call on three rungs per climb. deepseek never did.
++- **Nobody cheated.** Zero test-write attempts, zero stops with public tests red,
++  zero bad or malformed tool calls across the twelve climbs.
++
++## Results, 2026-11-03: the house model on the llama.cpp pool
++
++`qwen3.8-u:27b` is the pool's house model: the JonathanColetti Qwen3.8-27B-Uncensored
++imatrix Q4_K_M blob re-tagged, not the October `qwen3.8:27b` blob. It ran through
++gpu-host's `llama-server` (build b12062, `seat-mode local`: both 5060 Tis, context 131072,
++all layers on GPU, 12.3 and 11.6 GB resident) over `/v1`, ladder hash `117324ad4fa1`,
++three repeats, think off, temperature 0, seed 0. The pool was in everyday use by the
++agents during the run, so the wall numbers are a shared seat.
++
++| Model | Hash | Passed | Gain | Height (min to max) | Median turns on a pass | Tokens | Minutes |
++|---|---|---|---|---|---|---|---|
++| qwen3.8-u:27b | 1173 | 13/16 | 94% | 8 (8 to 8) | 5 | 16k | 12.1 |
++
++Classic sections: speed 24.3 tok/s, quiz 8/10, ceiling 4/5, repair 8/8, old ladder 8/8.
++
++- **Same score as the October `qwen3.8:27b`, different misses.** Three identical
++  climbs at 13 of 16. It falls on shlex (the empty word from `''`, like every local
++  model), cron (7 is not Sunday), and expr (`0 ** -1` escapes as ZeroDivisionError, the
++  same catch that takes deepseek). The October blob passed cron and failed allocate;
++  this one holds the spec above the wrong assertion on allocate three for three.
++- **Three times the wall time of the Ollama climb for the same work.** Twelve minutes
++  a climb against four in October, at the same decode speed (24.3 tok/s against the
++  pool's measured 23.8). The turns are the same count and length; the difference is
++  per-turn latency on a server whose four slots are shared with the agents, so the
++  prompt cache is not the harness's to keep. Read the minutes as the pool's everyday
++  latency, not the model's.
++- **Quiz misses are one wrong answer and one ramble.** discount came out 104 instead
++  of 65; shop ended on a bullet of shift times instead of the number. The ceiling miss
++  is two-counter, off by one on the second counter.
++- **Clean behaviour.** No test-write attempts, no red stops, no bad tool calls, no
++  length stops. It ran out of turns on bucket (passed anyway) and shlex on every climb.
++
++## Results, 2026-11-03: the October blob on the llama.cpp pool
++
++With the fleet drained, `seat-mode model qwen3.8:27b` put the exact October blob
++(Qwen3.8 27B 0814, Q4_K_M, 15 GiB) on the pool in `local` mode: both 5060 Tis, layer
++split, flash attention on, q8_0 K and V cache, context 131072, 23.9 GB resident. Same
++protocol and hash `117324ad4fa1`, three repeats, nothing else on the server. The pool
++went back to the house model afterwards, verify PASS.
++
++| Model | Hash | Engine | Passed | Gain | Height (min to max) | Median turns on a pass | Tokens | Minutes |
++|---|---|---|---|---|---|---|---|---|
++| qwen3.8:27b | f344 | Ollama 0.40.11 (2026-10-26) | 13/16 | 94% | 8 (8 to 8) | 4 | 14k | 4.2 |
++| qwen3.8:27b | 1173 | llama-server b12062 | 12/16 | 86% | 8 (8 to 8) | 4.5 | 21k | 15.9 |
++| qwen3.8-u:27b | 1173 | llama-server b12062 | 13/16 | 94% | 8 (8 to 8) | 5 | 16k | 12.1 |
++
++Classic sections on the pool: speed 24.3 tok/s, quiz 8/10 (shop rambled, discount gave
++104), ceiling 5/5, repair 8/8, old ladder 8/8.
++
++- **Same blob, different engine, one rung lower.** On Ollama it missed shlex, expr,
++  and allocate and cleared undo in four turns on every climb. On llama-server it misses
++  the same three plus undo, three for three: it writes a fix, then re-runs one failing
++  self-check snippet eight times without touching the source until the twelve turns
++  are gone. On expr its rewrite breaks the tokenizer and it spends the budget re-running
++  the same diagnostic. Greedy decoding is only as reproducible as the engine: the chat
++  template that renders tool calls and results, and the q8_0 KV cache, both differ
++  from Ollama's, and that is enough to move a 27B from 13 to 12. The October row and
++  the pool rows are different seats and should not be read as a before and after.
++- **The pool decodes at under half the October pace.** Median turn 5.1 s against 2.3 s
++  in October, p90 24 s against 6 s, with the prompt cache confirmed working (a
++  repeated 2.9k-token prefix reprocesses 4 tokens). The climb is decode-bound: 21k
++  tokens at 24.3 tok/s is fourteen of the sixteen minutes. The October climbs implied
++  about 60 tok/s from the same blob on the same two cards under Ollama. The pool's
++  layer split runs one card at a time; `--split-mode row` would use both at once and
++  is the first thing to measure in `seat-mode local`.
++- **The house re-tag is not the same model.** `qwen3.8-u:27b` passed undo and
++  allocate where this blob did not, and missed cron where this blob passed. Treat
++  them as two models.
++- **A result file is named by model.** This run overwrote the October
++  `qwen3.8-27b.json`; its per-rung lines survive in `results/ladder/sweep-gpu-host.log`
++  and in the table above. `run.py` now moves an existing result and its transcripts
++  aside under their hash and date before writing, so this cannot recur.
++
+ What the climbs showed:
+ 
+ - **The thirteen-rung draft could not rank these models.** qwen3.8:27b, flint:40b, and
+diff --git a/ladder/harness.py b/ladder/harness.py
+index 48f59cf..ea38fa5 100644
+--- a/ladder/harness.py
++++ b/ladder/harness.py
+@@ -175,7 +175,8 @@ def dec(e, mk):
+ # call, new, method, and getattr requests, one JSON line each. Anything the
+ # submission prints goes to stderr so it cannot touch the protocol stream.
+ WORKER_BODY = r'''
+-import sys, importlib, builtins
++import sys, importlib, builtins, time as _time
++_clock = _time.perf_counter  # bound before the submission loads, so it cannot be patched
+ _out = sys.stdout
+ sys.stdout = sys.stderr
+ 
+@@ -241,20 +242,24 @@ for line in sys.stdin:
+         else:
+             target = getattr(importlib.import_module(req["module"]), req["name"])
+         before = _json.dumps(enc(args, H))
++        t0 = _clock()
+         try:
+             value = target(*args, **kwargs)
+         except KeyboardInterrupt:
+             raise
+         except BaseException as exc:
++            secs = _clock() - t0
+             after = _json.dumps(enc(args, H))
+-            send({"ok": False, "exc": exc_record(exc), "args": None if after == before else _json.loads(after)})
++            send({"ok": False, "exc": exc_record(exc), "secs": secs,
++                  "args": None if after == before else _json.loads(after)})
+             continue
++        secs = _clock() - t0
+         after = _json.dumps(enc(args, H))
+         if op == "new":
+             out = [_H, H.put(value), type(value).__name__]
+         else:
+             out = enc(value, H)
+-        send({"ok": True, "value": out, "args": None if after == before else _json.loads(after)})
++        send({"ok": True, "value": out, "secs": secs, "args": None if after == before else _json.loads(after)})
+     except KeyboardInterrupt:
+         raise
+     except BaseException as exc:
+@@ -336,8 +341,11 @@ def make_exc(rec):
+             return cls(rec.get("msg", ""))
+     return RuntimeError(rec.get("msg", ""))
+ 
++LAST = {"secs": None}
++
+ def invoke(req, args):
+     resp = rpc(req)
++    LAST["secs"] = resp.get("secs")
+     if resp.get("args") is not None:
+         for old, fresh in zip(args, dec(resp["args"], mkp)):
+             sync(old, fresh)
+@@ -385,6 +393,14 @@ class Finder(importlib.abc.MetaPathFinder, importlib.abc.Loader):
+ 
+ sys.meta_path.insert(0, Finder())
+ 
++# ladder_clock.last_call_seconds() is how a hidden test times the submission: the
++# seconds the worker spent inside the most recent proxied call, measured by a clock
++# bound before the submission loaded. It leaves out the protocol's own cost, which
++# on 100k-entry arguments is most of a wall-clock measurement taken here.
++clock_mod = types.ModuleType("ladder_clock")
++clock_mod.last_call_seconds = lambda: LAST["secs"]
++sys.modules["ladder_clock"] = clock_mod
++
+ def emit(payload, code):
+     try:
+         worker.kill()
+diff --git a/ladder/report.py b/ladder/report.py
+index c1b9589..33250e8 100644
+--- a/ladder/report.py
++++ b/ladder/report.py
+@@ -65,30 +65,30 @@ def render(reports: list[dict]) -> str:
+     hashes = sorted({d["ladder_hash"] for d in reports})
+     lines.append(f"Ladder hash {', '.join(hashes)}. " + ("Runs with different hashes ran different ladders." if len(hashes) > 1 else ""))
+     lines.append("")
+-    lines.append("| Model | Passed | Gain | Height | Peak | Median turns | Tokens | Minutes | Red stops | GPU |")
+-    lines.append("|---|---|---|---|---|---|---|---|---|---|")
++    lines.append("| Model | Hash | Passed | Gain | Height | Peak | Median turns | Tokens | Minutes | Red stops | GPU |")
++    lines.append("|---|---|---|---|---|---|---|---|---|---|---|")
+     for d in reports:
+         s = d["score"]
+         loaded = (d.get("seat_after") or {}).get("loaded") or {}
+         gpu = f"{loaded['gpu_percent']}%" if loaded.get("gpu_percent") is not None else "-"
+         turns = s.get("median_turns_on_pass")
+         lines.append(
+-            f"| {d['model']} | {s['passed']}/{s['n']} | {s.get('gain', 0):.0%} | {s['height']}/{s['n']} | {s.get('peak', 0)} | "
++            f"| {d['model']} | {d['ladder_hash'][:4]} | {s['passed']}/{s['n']} | {s.get('gain', 0):.0%} | {s['height']}/{s['n']} | {s.get('peak', 0)} | "
+             f"{turns if turns is not None else '-'} | {s['eval_tokens']} | {s['seconds'] / 60:.1f} | "
+             f"{s.get('stopped_red', 0)} | {gpu} |")
+     lines.append("")
+     lines.append("Passed is rungs whose hidden tests all pass. Gain is hidden cases passed above the cases that already pass on the untouched bug. Height is the highest rung with every rung below it also passed; peak is the highest rung passed at all.")
+     lines.append("")
+-    header = "| Model | " + " | ".join(f"{i + 1} {rid}" for i, rid in enumerate(rung_ids)) + " |"
++    header = "| Model | Hash | " + " | ".join(f"{i + 1} {rid}" for i, rid in enumerate(rung_ids)) + " |"
+     lines.append(header)
+-    lines.append("|---|" + "---|" * len(rung_ids))
++    lines.append("|---|---|" + "---|" * len(rung_ids))
+     for d in reports:
+         by_rung: dict = {}
+         for run in d["runs"]:
+             for r in run["rows"]:
+                 by_rung.setdefault(r["id"], []).append(r)
+         cells = [rung_cell(by_rung[rid]) if rid in by_rung else "-" for rid in rung_ids]
+-        lines.append(f"| {d['model']} | " + " | ".join(cells) + " |")
++        lines.append(f"| {d['model']} | {d['ladder_hash'][:4]} | " + " | ".join(cells) + " |")
+     lines.append("")
+     lines.append("Cell legend: `pass`, or repeats passed and the best hidden-case count; `turns` ran out of turns; `length` a reply hit the generation cap; `red` stopped with public tests failing; `wrote-tests` tried to edit a test; `malformed` a tool call the server could not parse; `err` a request failed.")
+     lines.append("")
+diff --git a/ladder/run.py b/ladder/run.py
+index 9a72db1..1397ca1 100755
+--- a/ladder/run.py
++++ b/ladder/run.py
+@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
+ 
+ import harness  # noqa: E402
+ import rungs as rung_defs  # noqa: E402
++import v1chat  # noqa: E402
+ 
+ ROOT = Path(__file__).resolve().parent.parent
+ LADDER_VERSION = "2026-10-26c"
+@@ -63,10 +64,11 @@ def user_prompt(rung: dict, total: int) -> str:
+ 
+ # ----------------------------------------------------------------------------- clients
+ 
+-class MalformedToolCall(Exception):
++class MalformedToolCall(v1chat.MalformedToolCall):
+     """The model produced a tool call the server could not parse. Ollama 0.40 reports
+     this as HTTP 500 with "invalid tool call arguments" instead of returning the
+-    message, so the harness turns it into a bad tool call and lets the model retry."""
++    message, so the harness turns it into a bad tool call and lets the model retry.
++    On /v1 the arguments arrive as a string and v1chat raises its base class."""
+ 
+ 
+ class OllamaClient:
+@@ -115,6 +117,8 @@ class OllamaClient:
+                 if exc.code < 500:
+                     raise
+                 last = exc
++            except v1chat.MalformedToolCall as exc:
++                raise MalformedToolCall(str(exc)) from None
+             except (urllib.error.URLError, ConnectionError, TimeoutError) as exc:
+                 last = exc
+             print(f"  retry {attempt + 1} after {type(last).__name__}: {str(last)[:80]}", flush=True)
+@@ -177,6 +181,32 @@ class OllamaClient:
+         }
+ 
+ 
++class V1Client(OllamaClient):
++    """The same protocol on an OpenAI-compatible /v1 endpoint such as llama-server.
++    The host's context window is the seat; num_ctx cannot be set per request."""
++
++    def _chat_once(self, messages: list) -> tuple[dict, dict]:
++        data = v1chat.chat(self.host, self.model, messages, self.num_predict, tools=harness.TOOLS,
++                           think=self.think, seed=self.seed, timeout=self.timeout, num_ctx=self.num_ctx)
++        msg = data["message"]
++        meta = {
++            "wall": round(data["_wall"], 2),
++            "thinking_chars": len(msg.get("thinking") or ""),
++            "content_chars": len(msg.get("content") or ""),
++            "prompt_eval_count": data.get("prompt_eval_count"),
++            "eval_count": data.get("eval_count"),
++            "eval_duration": data.get("eval_duration"),
++            "done_reason": data.get("done_reason"),
++        }
++        return msg, meta
++
++    def seat(self) -> dict:
++        info = v1chat.seat(self.host, self.model)
++        info.update({"think": self.think, "num_ctx": self.num_ctx, "num_predict": self.num_predict,
++                     "seed": self.seed, "temperature": 0})
++        return info
++
++
+ PROBE = r"""
+ import glob, os
+ root = os.path.basename(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) if "__file__" in dir() else ""
+@@ -268,6 +298,30 @@ class MockClient:
+         return {"host": "mock", "model": self.model}
+ 
+ 
++def archive_previous(out_dir: Path, safe: str) -> None:
++    """A result file is named by model, so a second climb of the same tag would
++    overwrite the first. Move an existing result and its transcripts aside under
++    their own ladder hash and date first; report.py then shows both, by hash."""
++    path = out_dir / f"{safe}.json"
++    if not path.is_file():
++        return
++    try:
++        old = json.loads(path.read_text())
++        label = f"{str(old.get('ladder_hash') or 'nohash')[:4]}-{str(old.get('started') or '')[:10].replace('-', '') or 'nodate'}"
++    except (json.JSONDecodeError, OSError):
++        label = "unknown"
++    dest = out_dir / f"{safe}-{label}.json"
++    n = 1
++    while dest.exists():
++        n += 1
++        dest = out_dir / f"{safe}-{label}-{n}.json"
++    path.rename(dest)
++    tdir = out_dir / safe
++    if tdir.is_dir():
++        tdir.rename(out_dir / dest.stem)
++    print(f"archived the previous result as {dest.name}", flush=True)
++
++
+ # ----------------------------------------------------------------------------- loop
+ 
+ def run_rung(client, rung: dict, total: int, max_turns: int | None, transcript_dir: Path | None) -> dict:
+@@ -561,10 +615,12 @@ def main() -> int:
+     else:
+         if not (args.host and args.model):
+             ap.error("host and model are required unless --check or --mock is given")
+-        client = OllamaClient(args.host, args.model, args.num_predict, args.timeout,
++        client = (V1Client if v1chat.is_v1(args.host) else OllamaClient)(args.host, args.model, args.num_predict, args.timeout,
+                               args.keep_alive, args.think, args.num_ctx, args.seed)
+     total = len(rung_defs.RUNGS)
+     safe = client.model.replace(":", "-").replace("/", "-") + (f"-{args.tag}" if args.tag else "")
++    if not isinstance(client, MockClient):
++        archive_previous(out_dir, safe)
+     out_dir = ROOT / "results" / "ladder"
+     out_dir.mkdir(parents=True, exist_ok=True)
+     transcripts = None if args.no_transcripts else out_dir / safe
+diff --git a/ladder/rungs.py b/ladder/rungs.py
+index 5b25967..afd7273 100644
+--- a/ladder/rungs.py
++++ b/ladder/rungs.py
+@@ -3118,7 +3118,8 @@ rung(
+             self.assertEqual(count_in_ranges([], [(0, 1)]), [0])
+     """),
+     tests("""
+-    import hashlib, json, random, time
++    import hashlib, json, random
++    import ladder_clock
+     from mod import count_in_ranges
+     class T(unittest.TestCase):
+         def test_small(self):
+@@ -3140,9 +3141,8 @@ rung(
+             for _ in range(n):
+                 a, b = rng.randint(0, 10 ** 6), rng.randint(0, 10 ** 6)
+                 ranges.append((min(a, b), max(a, b)))
+-            t0 = time.perf_counter()
+             got = count_in_ranges(points, ranges)
+-            elapsed = time.perf_counter() - t0
++            elapsed = ladder_clock.last_call_seconds()
+             self.assertEqual(len(got), n)
+             for i in range(0, n, n // 10):
+                 lo, hi = ranges[i]
+diff --git a/repair/loop.py b/repair/loop.py
+index 26f4d8a..15eff3f 100644
+--- a/repair/loop.py
++++ b/repair/loop.py
+@@ -16,6 +16,9 @@ import time
+ import urllib.request
+ from pathlib import Path
+ 
++sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ladder"))
++import v1chat  # noqa: E402
++
+ HOST = None
+ MODEL = None
+ MAX_TURNS = 5
+@@ -451,6 +454,11 @@ def dispatch(wd: Path, name: str, args: dict) -> str:
+ 
+ 
+ def chat(messages):
++    if v1chat.is_v1(HOST):
++        t0 = time.perf_counter()
++        data = v1chat.chat(HOST, MODEL, messages, 1800, tools=TOOLS, think=False, timeout=300)
++        msg = data.get("message") or {}
++        return msg, round(time.perf_counter() - t0, 2), data.get("eval_count"), data.get("done_reason")
+     body = {
+         "model": MODEL,
+         "stream": False,
+diff --git a/repair/loop2.py b/repair/loop2.py
+index 23ee734..b5df5cc 100644
+--- a/repair/loop2.py
++++ b/repair/loop2.py
+@@ -14,6 +14,9 @@ from pathlib import Path
+ import loop
+ 
+ MAX_TURNS = 6
++sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ladder"))
++import v1chat  # noqa: E402
++
+ HOST = None
+ MODEL = None
+ 
+@@ -365,6 +368,11 @@ def grade(task, files) -> dict:
+ 
+ 
+ def chat(messages):
++    if v1chat.is_v1(HOST):
++        t0 = time.perf_counter()
++        data = v1chat.chat(HOST, MODEL, messages, 2400, tools=loop.TOOLS, think=False, timeout=300)
++        msg = data.get("message") or {}
++        return msg, round(time.perf_counter() - t0, 2)
+     body = {
+         "model": MODEL,
+         "stream": False,

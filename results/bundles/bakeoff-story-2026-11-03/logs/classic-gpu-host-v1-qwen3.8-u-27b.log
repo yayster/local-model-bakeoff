@@ -1,0 +1,114 @@
+speed1 24.3 tok/s
+speed2 24.3 tok/s
+speed3 24.2 tok/s
+SPEED_MEDIAN 24.3
+quiz books OK last='6'
+quiz shop MISS last='*   From Shift A: 22:00–23:00, 23:00–00:00, 00:00–01:00, 01:00–02:00, 02:'
+quiz discount MISS last='104'
+quiz thursday OK last='2027-03-18'
+quiz closure OK last='[2, 2, 2]'
+quiz syllogism OK last='yes'
+quiz decoy OK last='2906'
+quiz tank60 OK last='60'
+quiz tool OK {'name': 'date_diff', 'arguments': {'start': '2026-02-01', 'end': '2026-03-01'}}
+quiz code OK
+QUIZ 8/10
+ceil long-machine OK last='-37'
+ceil two-counter MISS last='-7,-5'
+ceil ledger2 OK last='55'
+ceil impossible OK last='0'
+ceil both-days OK last='22'
+CEILING 4/5
+== chunks
+  turn 1 tools=['read_file', 'read_file'] 2.89s
+  turn 2 tools=['write_file'] 3.68s
+  turn 3 tools=['run_tests'] 0.76s
+chunks hidden turns 4 s 9.68
+== median
+  turn 1 tools=['read_file', 'read_file'] 2.77s
+  turn 2 tools=['write_file'] 4.42s
+  turn 3 tools=['run_tests'] 0.76s
+median hidden turns 4 s 9.17
+== second
+  turn 1 tools=['read_file', 'read_file'] 2.68s
+  turn 2 tools=['write_file'] 4.59s
+  turn 3 tools=['run_tests'] 0.76s
+second hidden turns 4 s 10.19
+== holiday
+  turn 1 tools=['read_file', 'read_file'] 2.81s
+  turn 2 tools=['write_file'] 5.17s
+  turn 3 tools=['run_tests'] 0.76s
+holiday hidden turns 4 s 10.72
+== duration
+  turn 1 tools=['read_file', 'read_file'] 2.71s
+  turn 2 tools=['write_file'] 5.7s
+  turn 3 tools=['run_tests'] 0.76s
+duration hidden turns 4 s 13.06
+== ledger
+  turn 1 tools=['read_file', 'read_file'] 2.76s
+  turn 2 tools=['write_file'] 3.96s
+  turn 3 tools=['run_tests'] 0.76s
+ledger hidden turns 4 s 9.87
+== discount
+  turn 1 tools=['read_file', 'read_file'] 2.81s
+  turn 2 tools=['write_file'] 4.71s
+  turn 3 tools=['run_tests'] 0.76s
+discount hidden turns 4 s 10.0
+== garage
+  turn 1 tools=['read_file', 'read_file'] 2.81s
+  turn 2 tools=['read_file'] 1.52s
+  turn 3 tools=['write_file'] 9.55s
+  turn 4 tools=['run_tests'] 0.76s
+garage hidden turns 5 s 22.45
+WROTE /home/user/local-model-bakeoff/repair/results/results-qwen3.8-u-27b.json PASSED 8 / 8
+== L1 clamp
+  turn 1 tools=['read_file', 'read_file'] 3.32s
+  turn 2 tools=['write_file'] 3.28s
+  turn 3 tools=['run_tests'] 0.76s
+  turn 4 stop 3.45s
+clamp hidden turns 4 s 11.03
+== L2 csv
+  turn 1 tools=['read_file', 'read_file'] 2.81s
+  turn 2 tools=['write_file'] 10.23s
+  turn 3 tools=['run_tests'] 0.76s
+  turn 4 stop 1.11s
+csv hidden turns 4 s 15.14
+== L3 comment
+  turn 1 tools=['read_file', 'read_file'] 2.76s
+  turn 2 tools=['write_file'] 4.8s
+  turn 3 tools=['run_tests'] 0.76s
+  turn 4 stop 4.62s
+comment hidden turns 4 s 13.13
+== L4 rolling
+  turn 1 tools=['read_file', 'read_file'] 2.82s
+  turn 2 tools=['write_file'] 5.33s
+  turn 3 tools=['run_tests'] 0.76s
+  turn 4 stop 1.9s
+rolling hidden turns 4 s 11.05
+== L5 tax
+  turn 1 tools=['read_file', 'read_file', 'read_file'] 3.89s
+  turn 2 tools=['write_file'] 3.67s
+  turn 3 tools=['run_tests'] 0.76s
+  turn 4 stop 4.12s
+tax hidden turns 4 s 12.65
+== L6 rooms
+  turn 1 tools=['read_file', 'read_file'] 2.85s
+  turn 2 tools=['run_tests'] 0.9s
+  turn 3 tools=['write_file'] 18.02s
+  turn 4 tools=['run_tests'] 0.76s
+  turn 5 stop 2.83s
+rooms hidden turns 5 s 25.66
+== L7 transfer
+  turn 1 tools=['read_file', 'read_file'] 2.89s
+  turn 2 tools=['write_file'] 3.25s
+  turn 3 tools=['run_tests'] 0.76s
+  turn 4 stop 2.6s
+transfer hidden turns 4 s 9.71
+== L8 backoff
+  turn 1 tools=['read_file', 'read_file'] 2.82s
+  turn 2 tools=['write_file'] 3.74s
+  turn 3 tools=['run_tests'] 0.76s
+  turn 4 stop 3.49s
+backoff hidden turns 4 s 11.02
+WROTE /home/user/local-model-bakeoff/repair/results/results2-qwen3.8-u-27b.json PASSED 8 / 8
+WROTE /home/user/local-model-bakeoff/results/qwen3.8-u-27b.json

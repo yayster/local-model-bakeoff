@@ -1,0 +1,10 @@
+######## ladder2 glm-5.3-flash:cloud 14:55:42
+######## ladder2 glm-5.3-flash:cloud exit 0 15:08:16
+######## ladder2 deepseek-v4.1-flash:cloud 15:08:16
+######## ladder2 deepseek-v4.1-flash:cloud exit 0 15:11:29
+mock gold: LADDER height 16/16 peak 16 passed 16/16 cases 73/73 gain 100% above the 23-case floor tokens 0 secs 8.0
+mock lazy: LADDER height 0/16 peak 0 passed 0/16 cases 23/73 gain 0% above the 23-case floor tokens 0 secs 27.6
+mock trap: LADDER height 0/16 peak 0 passed 0/16 cases 47/73 gain 48% above the 23-case floor tokens 0 secs 9.8
+mock cheat: LADDER height 16/16 peak 16 passed 16/16 cases 73/73 gain 100% above the 23-case floor tokens 0 secs 8.6
+mock loop: LADDER height 0/16 peak 0 passed 0/16 cases 23/73 gain 0% above the 23-case floor tokens 0 secs 48.7
+######## all done 15:13:12

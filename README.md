@@ -3,6 +3,11 @@
 The suite behind the 2026-10-25 comparison of `qwen3.8:27b`, `flint:40b`, `ornith-1.5:35b`, and `laguna-xs-2.1:q4_K_M` on a machine with two 16 GB GPUs.
 
 It talks to Ollama's `/api/chat`. Point it at any Ollama that has the tag pulled.
+A host whose path ends in `/v1` (for example `http://gpu-host:11434/v1`) is treated as an
+OpenAI-compatible endpoint instead, such as llama.cpp's `llama-server`; `ladder/v1chat.py`
+maps the protocol both ways, so every section and the ladder run unchanged. On `/v1`
+thinking is turned off through the chat template, `num_ctx` is the server's setting,
+and speed comes from the server's `timings`.
 
 ## Run
 

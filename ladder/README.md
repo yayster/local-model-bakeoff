@@ -8,11 +8,12 @@ that talk to Ollama's `/api/chat`. It replaces the eight-repair ladder in
 
 ```bash
 python3 ladder/run.py --check                                   # validate the ladder, no model
-python3 ladder/run.py http://zerotwo:11434 ornith-1.5:9b         # full climb, 3 minutes for a 27B, 20 for a 9B
-python3 ladder/run.py http://zerotwo:11434 ornith-1.5:9b --repeats 3   # the protocol for a ranking
-python3 ladder/sweep.py http://abzu:11434 qwen3.8:27b flint:40b  # several models, one at a time, unloaded between
+python3 ladder/run.py http://aux-host:11434 ornith-1.5:9b         # full climb, 3 minutes for a 27B, 20 for a 9B
+python3 ladder/run.py http://aux-host:11434 ornith-1.5:9b --repeats 3   # the protocol for a ranking
+python3 ladder/sweep.py http://gpu-host:11434 qwen3.8:27b flint:40b  # several models, one at a time, unloaded between
+python3 ladder/run.py http://gpu-host:11434/v1 qwen3.8-u:27b      # an OpenAI-compatible /v1 host, such as llama-server
 python3 ladder/report.py                                        # table of every result file
-python3 bakeoff.py http://zerotwo:11434 ornith-1.5:9b --sections ladder2
+python3 bakeoff.py http://aux-host:11434 ornith-1.5:9b --sections ladder2
 ```
 
 Results land in `results/ladder/<model>.json`, full transcripts in
@@ -144,8 +145,13 @@ Ladder hash `f344b4221dbe` at the time of these climbs, three repeats per model,
 think off, temperature 0, seed 0, every model at 100% GPU. After review the ranges
 rung now times the call against the spec's own 2 second limit and checks every count
 through a digest, which changed the hash; every recorded ranges pass ran well under a
-second, so these numbers stand, but a strict comparison with a new climb needs a rerun. The four large models ran on abzu (Ollama 0.40.11, context
-131072); the 9B ran on zerotwo (Ollama 0.40.6, context 65536). Medians across repeats.
+second, so these numbers stand, but a strict comparison with a new climb needs a rerun.
+Since 2026-11-03 that timing is taken inside the worker, by a clock bound before the
+submission loads, and reaches the test as `ladder_clock.last_call_seconds()`; under the
+two-process grader a wall clock in the assertion process had been counting the proxy's
+own cost on 100k-entry arguments, about 2 s for the gold, and the case had become a
+coin flip. The four large models ran on gpu-host (Ollama 0.40.11, context
+131072); the 9B ran on aux-host (Ollama 0.40.6, context 65536). Medians across repeats.
 
 | Model | Passed | Gain | Height (min to max) | Median turns on a pass | Tokens | Minutes |
 |---|---|---|---|---|---|---|
@@ -156,7 +162,7 @@ second, so these numbers stand, but a strict comparison with a new climb needs a
 | ornith-1.5:9b | 10/16 | 72% | 3 (3 to 3) | 6 | 41k | 28.9 |
 | glm-5.3-flash:cloud | 16/16 | 100% | 16 (16 to 16) | 6 | 38k | 3.5 |
 
-`glm-5.3-flash:cloud` is Ollama's cloud-proxied tag, run through zerotwo later the same
+`glm-5.3-flash:cloud` is Ollama's cloud-proxied tag, run through aux-host later the same
 day: no GPU seat, and its minutes measure the cloud service. It climbed all sixteen
 rungs on all three repeats, which also proves every rung is solvable from the spec by
 a real model, not only by the gold. Two caveats. With thinking off it still writes
@@ -165,6 +171,172 @@ call on nine rungs across the three climbs; the harness now nudges it and it rec
 On the classic sections the same leak cost it two format misses (quiz 9/10, ceiling
 4/5) because the last line carried reasoning text; repair and the old ladder were
 8/8 and 8/8, and speed reads 0 because the cloud tag reports no decode duration.
+
+## Results, 2026-11-03: the two cloud tags
+
+Both are Ollama cloud-proxied tags run through aux-host (Ollama 0.40.6): no GPU seat,
+and the minutes measure the cloud service. Three repeats per model, think off,
+temperature 0, seed 0. Medians across repeats. The first pair of rows ran on hash
+`c5d23430e675`, the first two-process grader; the second pair on `117324ad4fa1`, after
+the rung 15 fix described below. The result files for the first pair carry a `-c5d2`
+suffix and `report.py` shows a hash column so the two never fold into one row.
+
+| Model | Hash | Passed | Gain | Height (min to max) | Median turns on a pass | Tokens | Minutes |
+|---|---|---|---|---|---|---|---|
+| glm-5.3-flash:cloud | c5d2 | 16/16 | 100% | 16 (16 to 16) | 6 | 38k | 4.6 |
+| deepseek-v4.1-flash:cloud | c5d2 | 15/16 | 98% | 11 (11 to 11) | 5 | 11k | 1.0 |
+| glm-5.3-flash:cloud | 1173 | 16/16 | 100% | 16 (16 to 16) | 6 | 36k | 4.2 |
+| deepseek-v4.1-flash:cloud | 1173 | 15/16 | 98% | 11 (11 to 11) | 5 | 11k | 1.0 |
+
+Classic sections, same day: glm quiz 9/10, ceiling 4/5, repair 8/8, old ladder 8/8;
+deepseek quiz 6/10, ceiling 5/5, repair 8/8, old ladder 8/8. Speed reads 0 for both
+because the cloud tags report no decode duration.
+
+- **The ladder gap is one rung; the cost gap is three to four times.** deepseek
+  solves the rungs it solves in a fixed five-turn pattern (list, read, write, test,
+  stop), about 1,100 tokens per rung and a minute per climb. glm spends three and a
+  half times the tokens and four times the wall time for one more rung, and most of
+  that spend is the reasoning leak below. Read this as near-equal ladder results at
+  very different prices, not as a strong model and a weak one.
+- **Three repeats here are closer to one trial.** Both models produced the same fix
+  on every rung across all three climbs, so at temperature 0 the repeats measure one
+  behaviour three times. That is why the fix to rung 15 mattered: with the model's
+  side fixed, the only variance in the six climbs was the grader's clock.
+- **deepseek's one miss is expr, six for six.** Its parser maps `/` by zero to
+  ValueError but lets `0 ** -1` escape as Python's ZeroDivisionError; the
+  `test_errors` case catches it. The spec says division by zero raises ValueError and
+  that a negative exponent is allowed, so the catch is fair, but it is the subtlest
+  sentence on the ladder. Height 11 is not a route choice: height is the rung below
+  the first failure, and the first failure was rung 12 every time. Everything else,
+  including shlex and cron where every local model fell, passed three for three.
+- **Rung 15 was a coin flip on hash c5d2.** deepseek's third c5d2 climb missed
+  `test_large_is_fast` at 2.2 s with a fix byte-identical to its two passes. Under the
+  two-process grader the test's wall clock was counting the proxy's cost on the
+  100k-entry arguments: the six c5d2 climbs ran the hidden suite in 1.98 to 2.76 s and
+  `--mock gold` in 2.09 s against a 2 s limit. The worker now times each call with a
+  clock bound before the submission loads, and the test reads
+  `ladder_clock.last_call_seconds()`; the gold measures 0.23 s, the untouched bug
+  still times out, and both models passed rung 15 on all three 1173 climbs.
+- **Format, again.** deepseek's four quiz misses are two right values in bold and
+  two replies that ended on a closing code fence; harmless on the ladder, where the
+  harness reads tool calls, and exactly what breaks a strict parser downstream. glm's
+  ceiling miss is the same reasoning leak as in October, and it hit the 3000-token
+  cap before its first tool call on three rungs per climb. deepseek never did.
+- **Nobody cheated.** Zero test-write attempts, zero stops with public tests red,
+  zero bad or malformed tool calls across the twelve climbs.
+
+## Results, 2026-11-03: the house model on the llama.cpp pool
+
+`qwen3.8-u:27b` is the pool's house model: the JonathanColetti Qwen3.8-27B-Uncensored
+imatrix Q4_K_M blob re-tagged, not the October `qwen3.8:27b` blob. It ran through
+gpu-host's `llama-server` (build b12062, `seat-mode local`: both 5060 Tis, context 131072,
+all layers on GPU, 12.3 and 11.6 GB resident) over `/v1`, ladder hash `117324ad4fa1`,
+three repeats, think off, temperature 0, seed 0. The pool was in everyday use by the
+agents during the run, so the wall numbers are a shared seat.
+
+| Model | Hash | Passed | Gain | Height (min to max) | Median turns on a pass | Tokens | Minutes |
+|---|---|---|---|---|---|---|---|
+| qwen3.8-u:27b | 1173 | 13/16 | 94% | 8 (8 to 8) | 5 | 16k | 12.1 |
+
+Classic sections: speed 24.3 tok/s, quiz 8/10, ceiling 4/5, repair 8/8, old ladder 8/8.
+
+- **Same score as the October `qwen3.8:27b`, different misses.** Three identical
+  climbs at 13 of 16. It falls on shlex (the empty word from `''`, like every local
+  model), cron (7 is not Sunday), and expr (`0 ** -1` escapes as ZeroDivisionError, the
+  same catch that takes deepseek). The October blob passed cron and failed allocate;
+  this one holds the spec above the wrong assertion on allocate three for three.
+- **Three times the wall time of the Ollama climb for the same work.** Twelve minutes
+  a climb against four in October, at the same decode speed (24.3 tok/s against the
+  pool's measured 23.8). The turns are the same count and length; the difference is
+  per-turn latency on a server whose four slots are shared with the agents, so the
+  prompt cache is not the harness's to keep. Read the minutes as the pool's everyday
+  latency, not the model's.
+- **Quiz misses are one wrong answer and one ramble.** discount came out 104 instead
+  of 65; shop ended on a bullet of shift times instead of the number. The ceiling miss
+  is two-counter, off by one on the second counter.
+- **Clean behaviour.** No test-write attempts, no red stops, no bad tool calls, no
+  length stops. It ran out of turns on bucket (passed anyway) and shlex on every climb.
+
+## Results, 2026-11-03: the October blob on the llama.cpp pool
+
+With the fleet drained, `seat-mode model qwen3.8:27b` put the exact October blob
+(Qwen3.8 27B 0814, Q4_K_M, 15 GiB) on the pool in `local` mode: both 5060 Tis, layer
+split, flash attention on, q8_0 K and V cache, context 131072, 23.9 GB resident. Same
+protocol and hash `117324ad4fa1`, three repeats, nothing else on the server. The pool
+went back to the house model afterwards, verify PASS.
+
+| Model | Hash | Engine | Passed | Gain | Height (min to max) | Median turns on a pass | Tokens | Minutes |
+|---|---|---|---|---|---|---|---|---|
+| qwen3.8:27b | f344 | Ollama 0.40.11 (2026-10-26) | 13/16 | 94% | 8 (8 to 8) | 4 | 14k | 4.2 |
+| qwen3.8:27b | 1173 | llama-server b12062 | 12/16 | 86% | 8 (8 to 8) | 4.5 | 21k | 15.9 |
+| qwen3.8-u:27b | 1173 | llama-server b12062 | 13/16 | 94% | 8 (8 to 8) | 5 | 16k | 12.1 |
+
+Classic sections on the pool: speed 24.3 tok/s, quiz 8/10 (shop rambled, discount gave
+104), ceiling 5/5, repair 8/8, old ladder 8/8.
+
+- **Same blob, different engine, one rung lower.** On Ollama it missed shlex, expr,
+  and allocate and cleared undo in four turns on every climb. On llama-server it misses
+  the same three plus undo, three for three: it writes a fix, then re-runs one failing
+  self-check snippet eight times without touching the source until the twelve turns
+  are gone. On expr its rewrite breaks the tokenizer and it spends the budget re-running
+  the same diagnostic. Greedy decoding is only as reproducible as the engine: the chat
+  template that renders tool calls and results, and the q8_0 KV cache, both differ
+  from Ollama's, and that is enough to move a 27B from 13 to 12. The October row and
+  the pool rows are different seats and should not be read as a before and after.
+- **The pool decodes at under half the October pace.** Median turn 5.1 s against 2.3 s
+  in October, p90 24 s against 6 s, with the prompt cache confirmed working (a
+  repeated 2.9k-token prefix reprocesses 4 tokens). The climb is decode-bound: 21k
+  tokens at 24.3 tok/s is fourteen of the sixteen minutes. The October climbs implied
+  about 60 tok/s from the same blob on the same two cards under Ollama. The pool's
+  layer split runs one card at a time; `--split-mode row` would use both at once and
+  is the first thing to measure in `seat-mode local`.
+- **The house re-tag is not the same model.** `qwen3.8-u:27b` passed undo and
+  allocate where this blob did not, and missed cron where this blob passed. Treat
+  them as two models.
+- **A result file is named by model.** This run overwrote the October
+  `qwen3.8-27b.json`; its per-rung lines survive in `results/ladder/sweep-gpu-host.log`
+  and in the table above. `run.py` now moves an existing result and its transcripts
+  aside under their hash and date before writing, so this cannot recur.
+
+## Results, 2026-11-12 and 13: Qwen3.8-Flash-Next on Strata
+
+`seat-mode strata` replaces the pool on the same port with the Strata engine
+(Terminal 0.2.13.1, engine 0.1.59, CUDA 13): Qwen3.8-Flash-Next, a 125B MoE with 6B
+active, in the ISTA-DASLab GSQ-RCO IQ3_XXS cut, routed experts in RAM, dense layers,
+hot-expert cache and KV on one 5060 Ti, MTP drafting on. Context 262144, one request
+at a time. Hash `117324ad4fa1`, one climb each, think off, temperature 0, seed 0. The
+second row is SC117's abliterated transplant of the same shards (a rank-1 refusal
+edit on the dense layers; shard 2 is byte-identical to stock), run from a second run
+config on the same seat. The stock climb ran while the agents were using the seat.
+
+| Model | Hash | Engine | Passed | Gain | Height | Median turns on a pass | Tokens | Minutes |
+|---|---|---|---|---|---|---|---|---|
+| qwen3.8-flash-next-iq3_xxs | 1173 | Strata 0.1.59, one 5060 Ti | 15/16 | 98% | 11 | 6 | 19k | 4.0 |
+| qwen3.8-flash-next-iq3_xxs-abliterated | 1173 | Strata 0.1.59, one 5060 Ti | 15/16 | 98% | 12 | 8 | 37k | 6.7 |
+| qwen3.8-u:27b | 1173 | llama-server b12062, two 5060 Tis | 13/16 | 94% | 8 | 5 | 16k | 12.1 |
+
+Classic sections, stock model: speed 134 tok/s as the harness measures it (the MTP
+drafter inflates the per-token figure; a plain decode is 59 to 75 tok/s), quiz 9/10
+(shop hit the length cap mid-list), ceiling 3/5 (long-machine gave -20 for -37,
+two-counter -7,-5 for -7,-4), repair 8/8 in 41 s, old ladder 8/8 in 51 s. The house
+27B on the same sections: 24.3 tok/s, 8/10, 4/5, 8/8 in 95 s, 8/8 in 109 s.
+
+- **Two rungs higher than the house model at a third of the wall time.** The stock
+  climb clears shlex and cron, where every local model had fallen, and allocate. Its
+  one miss is expr, the same `0 ** -1` ZeroDivisionError that takes deepseek and the
+  27B. Four minutes a climb against twelve, on one card instead of two, with the
+  larger context thrown in.
+- **The abliterated cut scores the same and costs twice as much.** It passes expr and
+  misses undo instead: after an undo and a fresh edit its history keeps the stale redo
+  branch, so `test_new_edit_discards_redo` reads `abc` for `ac`. It ran out of twelve
+  turns on seven rungs against four for stock, mostly re-running probe snippets before
+  committing a write, and spent twice the tokens. The refusal edit buys nothing on
+  this ladder; stock stays the default profile, the abliterated run config is kept on
+  gpu-host for prompts that need it.
+- **One climb each, not three.** Temperature 0 on this engine has not been checked
+  for repeatability the way the pool runs were; read the rows as a draft ranking.
+- **Nobody cheated.** Zero test-write attempts, zero red stops, zero bad or malformed
+  tool calls, zero length stops on either climb.
 
 What the climbs showed:
 

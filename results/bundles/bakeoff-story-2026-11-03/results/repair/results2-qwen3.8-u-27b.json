@@ -1,0 +1,79 @@
+{
+  "model": "qwen3.8-u:27b",
+  "passed": 8,
+  "n": 8,
+  "rows": [
+    {
+      "id": "clamp",
+      "level": 1,
+      "turns": 4,
+      "seconds": 11.03,
+      "public": true,
+      "hidden": true,
+      "hidden_tail": ".\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nOK"
+    },
+    {
+      "id": "csv",
+      "level": 2,
+      "turns": 4,
+      "seconds": 15.14,
+      "public": true,
+      "hidden": true,
+      "hidden_tail": ".\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nOK"
+    },
+    {
+      "id": "comment",
+      "level": 3,
+      "turns": 4,
+      "seconds": 13.13,
+      "public": true,
+      "hidden": true,
+      "hidden_tail": ".\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nOK"
+    },
+    {
+      "id": "rolling",
+      "level": 4,
+      "turns": 4,
+      "seconds": 11.05,
+      "public": true,
+      "hidden": true,
+      "hidden_tail": "..\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nOK"
+    },
+    {
+      "id": "tax",
+      "level": 5,
+      "turns": 4,
+      "seconds": 12.65,
+      "public": true,
+      "hidden": true,
+      "hidden_tail": ".\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nOK"
+    },
+    {
+      "id": "rooms",
+      "level": 6,
+      "turns": 5,
+      "seconds": 25.66,
+      "public": true,
+      "hidden": true,
+      "hidden_tail": ".\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nOK"
+    },
+    {
+      "id": "transfer",
+      "level": 7,
+      "turns": 4,
+      "seconds": 9.71,
+      "public": true,
+      "hidden": true,
+      "hidden_tail": ".\n----------------------------------------------------------------------\nRan 1 test in 0.001s\n\nOK"
+    },
+    {
+      "id": "backoff",
+      "level": 8,
+      "turns": 4,
+      "seconds": 11.02,
+      "public": true,
+      "hidden": true,
+      "hidden_tail": ".\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nOK"
+    }
+  ]
+}

@@ -1,0 +1,185 @@
+{
+ "messages": [
+  {
+   "role": "system",
+   "content": "You are repairing a small Python project. Work only through the tools. Read SPEC.txt first, then the source. Do not write or edit tests; tests are not the whole specification. When the code matches the spec and the public tests pass, apart from any public assertion the task note says is wrong, reply with one line that says what you changed and make no further tool call."
+  },
+  {
+   "role": "user",
+   "content": "Rung 10 of 16: JSON Pointer. Source files: mod.py. Tools: list_files, read_file, write_file, run_tests, run_python. Public tests are in test_public.py. Do not stop while run_tests still fails, and remember that a green public run can still leave the spec wrong.\n\nSPEC:\nresolve(doc, pointer) returns the value that a JSON Pointer (RFC 6901) names inside doc, a structure of dicts, lists, and scalars. The empty pointer names doc itself. Otherwise the pointer starts with '/' and each '/'-separated token selects a dict key, or a list index written as decimal digits. Inside a token '~1' stands for '/' and '~0' stands for '~', decoded in that order, so '~01' means the two characters '~1'. A missing key, an index that is not all digits, an index past the end, or a step into a scalar raises KeyError. set_at(doc, pointer, value) changes doc in place and returns None: it resolves all but the last token the same way, then on a dict sets the key, and on a list replaces the index, or appends when the last token is '-'. Any other failure raises KeyError. Examples are Python. resolve({'a': {'b': [10, 20]}}, '/a/b/1') is 20. resolve({'a/b': 1}, '/a~1b') is 1. resolve({'~1': 5}, '/~01') is 5. resolve({'': 3}, '/') is 3. resolve([1, 2], '') is [1, 2]. resolve({'a': [1]}, '/a/1') raises KeyError. With d = {'a': [1]}; set_at(d, '/a/-', 2), d is {'a': [1, 2]}. With d = {'a': [1]}; set_at(d, '/a/0', 9), d is {'a': [9]}."
+  },
+  {
+   "role": "assistant",
+   "content": "Let me start by reading the spec and the source files.</think>",
+   "tool_calls": [
+    {
+     "id": "call_hcn4jajp",
+     "function": {
+      "index": 0,
+      "name": "read_file",
+      "arguments": {
+       "path": "SPEC.txt"
+      }
+     }
+    },
+    {
+     "id": "call_kadgwq5w",
+     "function": {
+      "index": 1,
+      "name": "list_files",
+      "arguments": {}
+     }
+    }
+   ]
+  },
+  {
+   "role": "tool",
+   "content": "resolve(doc, pointer) returns the value that a JSON Pointer (RFC 6901) names inside doc, a structure of dicts, lists, and scalars. The empty pointer names doc itself. Otherwise the pointer starts with '/' and each '/'-separated token selects a dict key, or a list index written as decimal digits. Inside a token '~1' stands for '/' and '~0' stands for '~', decoded in that order, so '~01' means the two characters '~1'. A missing key, an index that is not all digits, an index past the end, or a step into a scalar raises KeyError. set_at(doc, pointer, value) changes doc in place and returns None: it resolves all but the last token the same way, then on a dict sets the key, and on a list replaces the index, or appends when the last token is '-'. Any other failure raises KeyError. Examples are Python. resolve({'a': {'b': [10, 20]}}, '/a/b/1') is 20. resolve({'a/b': 1}, '/a~1b') is 1. resolve({'~1': 5}, '/~01') is 5. resolve({'': 3}, '/') is 3. resolve([1, 2], '') is [1, 2]. resolve({'a': [1]}, '/a/1') raises KeyError. With d = {'a': [1]}; set_at(d, '/a/-', 2), d is {'a': [1, 2]}. With d = {'a': [1]}; set_at(d, '/a/0', 9), d is {'a': [9]}.\n",
+   "tool_name": "read_file"
+  },
+  {
+   "role": "tool",
+   "content": "SPEC.txt\nmod.py\ntest_public.py",
+   "tool_name": "list_files"
+  },
+  {
+   "role": "assistant",
+   "content": "",
+   "tool_calls": [
+    {
+     "id": "call_jomtdv1m",
+     "function": {
+      "index": 0,
+      "name": "read_file",
+      "arguments": {
+       "path": "mod.py"
+      }
+     }
+    },
+    {
+     "id": "call_ofe3j3xr",
+     "function": {
+      "index": 1,
+      "name": "read_file",
+      "arguments": {
+       "path": "test_public.py"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "role": "tool",
+   "content": "def _tokens(pointer):\n    if not pointer:\n        raise KeyError(pointer)\n    return [t.replace('~0', '~').replace('~1', '/') for t in pointer[1:].split('/')]\n\n\ndef _step(node, token):\n    if isinstance(node, list):\n        return node[int(token)]\n    return node[token]\n\n\ndef resolve(doc, pointer):\n    node = doc\n    for token in _tokens(pointer):\n        node = _step(node, token)\n    return node\n\n\ndef set_at(doc, pointer, value):\n    tokens = _tokens(pointer)\n    node = doc\n    for token in tokens[:-1]:\n        node = _step(node, token)\n    last = tokens[-1]\n    if isinstance(node, list):\n        node[int(last)] = value\n    else:\n        node[last] = value\n",
+   "tool_name": "read_file"
+  },
+  {
+   "role": "tool",
+   "content": "import unittest\nfrom mod import resolve, set_at\nclass T(unittest.TestCase):\n    def test_basic(self):\n        self.assertEqual(resolve({'a': {'b': [10, 20]}}, '/a/b/1'), 20)\n        self.assertEqual(resolve({'a/b': 1}, '/a~1b'), 1)\n        d = {'a': [1]}\n        set_at(d, '/a/0', 9)\n        self.assertEqual(d, {'a': [9]})\n\nif __name__ == '__main__':\n    unittest.main()\n",
+   "tool_name": "read_file"
+  },
+  {
+   "role": "assistant",
+   "content": "Now let me analyze the spec carefully:\n\n1. `resolve(doc, pointer)`:\n   - Empty pointer names doc itself. Current code raises KeyError for empty pointer \u2014 bug.\n   - Otherwise pointer starts with '/'. Current code doesn't check that pointer starts with '/'. If pointer doesn't start with '/', it should raise KeyError presumably (any other failure raises KeyError).\n   - Tokens: split on '/', decode '~1' \u2192 '/' and '~0' \u2192 '~' in that order. Current code does `.replace('~0', '~').replace('~1', '/')` \u2014 wrong order! Spec says '~1' stands for '/' and '~0' stands for '~', decoded in that order, so '~01' means '~1'. So decode order: first replace '~1' with '/', then '~0' with '~'. Current code does '~0' first, which is wrong: '~01' would become '~1' \u2192 wait: '~01'.replace('~0','~') = '~1', then .replace('~1','/') = '/'. That gives '/' but spec says '~01' should be '~1'. So need to fix order: replace('~1','/') first, then replace('~0','~').\n   \n   Check: '~01' \u2192 replace('~1','/') \u2192 '~0' + '/'? Wait '~01' contains '~1'? '~01' is characters '~', '0', '1'. Does it contain '~1'? The substring '~1' would need '~' followed by '1'. In '~01', '~' is followed by '0', so no '~1' substring. Then replace('~0','~') \u2192 '~1'. Yes, '~01' \u2192 '~1'. Correct.\n   \n   And '~1' \u2192 replace('~1','/') \u2192 '/', then replace('~0','~') \u2192 '/'. Correct.\n   \n   And '~0' \u2192 replace('~1','/') \u2192 '~0' (no '~1'), then replace('~0','~') \u2192 '~'. Correct.\n\n2. `_step`:\n   - For dict: token selects key. Missing key \u2192 KeyError. `node[token]` on dict raises KeyError naturally. Good.\n   - For list: index written as decimal digits. Index not all digits \u2192 KeyError. Index past end \u2192 KeyError. Current code uses `int(token)` which raises ValueError for non-digits (should be KeyError), and negative indices like '-1' would work via int (should be KeyError since not all digits... well '-' is the append token for set_at; for resolve, '-' is not all digits so KeyError). Also int allows leading '+'/'-' and whitespace. Need: token must be all digits (str.isdigit? careful \u2014 isdigit accepts unicode digits like '\u00b2'... Actually '\u00b2'.isdigit() is True but int('\u00b2') fails. Better to check all chars in '0123456789'). Also index past end: `node[int(token)]` raises IndexError, should be KeyError.\n   - Step into a scalar: e.g., node is a string or int. `node[token]` on a string would do string indexing \u2014 wrong. On int raises TypeError. Spec: step into a scalar raises KeyError. So need to handle: if node is not dict or list \u2192 KeyError.\n   - Also for strings: 'abc'['0'] would return 'a' \u2014 must not happen. So check isinstance(node, (dict, list)).\n\n3. `set_at`:\n   - Resolves all but last token the same way (with same error semantics).\n   - On dict: sets key.\n   - On list: replaces index, or appends when last token is '-'.\n   - Any other failure raises KeyError.\n   - Current code: doesn't handle '-' append; uses int(last) which raises ValueError for non-digits; doesn't check index bounds for replace (list index out of range \u2192 IndexError, should be KeyError); doesn't handle scalar node (TypeError).\n   - Also empty pointer for set_at: pointer '' \u2014 there's no last token, so it's a failure \u2192 KeyError. Current `_tokens('')` raises KeyError already. But wait \u2014 for resolve, empty pointer is valid. For set_at, empty pointer should raise KeyError since you can't set the whole doc. Current code raises KeyError via _tokens. Keep that.\n   - Pointer not starting with '/' \u2192 KeyError.\n\nLet me also consider: for resolve, what about a pointer like 'a/b' (no leading slash)? Spec: \"Otherwise the pointer starts with '/'\". So a pointer that doesn't start with '/' (and isn't empty) is invalid \u2192 KeyError. Current code would split 'a/b'[1:] = '/b' \u2192 tokens ['a'? no...]. 'a/b'[1:] = '/b', split('/') \u2192 ['', 'b']. Wrong. Need explicit check.\n\nWhat about pointer '/'? That's a single empty token, selecting key '' in a dict. resolve({'': 3}, '/') is 3. With my code: pointer '/' \u2192 not empty, starts with '/', pointer[1:] = '' \u2192 split('/') \u2192 ['']. Token '' \u2192 dict key '' \u2192 3. Good.\n\nFor a list, token '' is not all digits \u2192 KeyError. Good.\n\nEdge: set_at with pointer '/' on dict {'': 3} \u2192 sets key '' to value. Fine.\n\nEdge: set_at on list with last token '-': append. What about '-' appearing in a non-last token for resolve? '-' is not all digits \u2192 KeyError. Good.\n\nEdge: set_at where parent resolution steps into scalar \u2192 KeyError. Where parent is a scalar \u2192 KeyError.\n\nEdge: set_at on list with last token like '05'? All digits, int \u2192 5. RFC 6901 says array index must be digits; leading zeros... RFC says \"the digits\" \u2014 actually RFC 6901: \"array_index = %x30-39 / (%x31-39 1*DIGIT)\" \u2014 meaning leading zeros are not allowed except \"0\" itself! Hmm. The spec here says \"a list index written as decimal digits\" and \"an index that is not all digits\" raises KeyError. It doesn't mention leading zeros. The spec's own definition: \"an index that is not all digits\" \u2192 KeyError. So '05' is all digits \u2192 index 5. I'll follow the spec text: all digits check, int conversion. The spec doesn't say leading zeros are invalid, so treat '05' as 5. Hmm, but strictly RFC 6901 disallows leading zeros. The task spec is authoritative here: \"an index that is not all digits\" raises KeyError. '05' is all digits, so it's valid. I'll go with that.\n\nAlso negative: '-1' is not all digits \u2192 KeyError for resolve. For set_at last token '-1': not '-', not all digits \u2192 KeyError. Good.\n\nNow, what about set_at on a list where the last token is '-' but the parent is a list \u2014 append. What if parent is a dict and last token '-'? Sets key '-'. That's fine per spec (\"on a dict sets the key\").\n\nWhat about set_at where the last token is '-' and parent is a list \u2014 append value. Good.\n\nAlso: \"Any other failure raises KeyError.\" So all errors should be KeyError, not ValueError/IndexError/TypeError.\n\nLet me also think about resolve with pointer that is only whitespace or something \u2014 not starting with '/' \u2192 KeyError.\n\nWhat about pointer starting with '/' but containing '#' or URI fragments? Spec doesn't mention; treat literally.\n\nNow write the code:\n\n```python\ndef _decode(token):\n    return token.replace('~1', '/').replace('~0', '~')\n\n\ndef _tokens(pointer):\n    if not pointer.startswith('/'):\n        raise KeyError(pointer)\n    return [_decode(t) for t in pointer[1:].split('/')]\n\n\ndef _is_index(token):\n    return token.isdigit() and token.isascii()\n```\n\nHmm, simpler: `token and all(c in '0123456789' for c in token)`. Actually `token.isdigit()` on '' is False. But '\u00b2'.isdigit() is True and int('\u00b2') raises ValueError. Use explicit check:\n\n```python\ndef _index(token):\n    if not token or not all(c in '0123456789' for c in token):\n        raise KeyError(token)\n    i = int(token)\n    return i\n```\n\nWait, but for resolve, an empty token on a dict is a valid key ''. On a list, empty token is not all digits \u2192 KeyError. So the digit check only applies when node is a list.\n\n```python\ndef _step(node, token):\n    if isinstance(node, dict):\n        return node[token]  # KeyError if missing\n    if isinstance(node, list):\n        if not (token.isdigit() and token.isascii()):\n            raise KeyError(token)\n        i = int(token)\n        if i >= len(node):\n            raise KeyError(token)\n        return node[i]\n    raise KeyError(token)\n```\n\nHmm, `token.isdigit()` \u2014 for ASCII check, '\u00b2'.isdigit() is True but int('\u00b2') fails with ValueError. Also '\u0661' (Arabic-Indic digit one) isdigit() True and int('\u0661') == 1! That would be wrong \u2014 \"written as decimal digits\" should mean ASCII 0-9. Use explicit set check:\n\n```python\n_DIGITS = set('0123456789')\n\ndef _as_index(token):\n    if not token or not all(c in _DIGITS for c in token):\n        raise KeyError(token)\n    i = int(token)\n    if i >= len(node): ...\n```\n\nAlso negative index can't happen since '-' not in digits.\n\nFor resolve:\n\n```python\ndef resolve(doc, pointer):\n    if pointer == '':\n        return doc\n    node = doc\n    for token in _tokens(pointer):\n        node = _step(node, token)\n    return node\n```\n\nFor set_at:\n\n```python\ndef set_at(doc, pointer, value):\n    tokens = _tokens(pointer)\n    node = doc\n    for token in tokens[:-1]:\n        node = _step(node, token)\n    last = tokens[-1]\n    if isinstance(node, dict):\n        node[last] = value\n    elif isinstance(node, list):\n        if last == '-':\n            node.append(value)\n        else:\n            i = _as_index(last)\n            if i >= len(node):\n                raise KeyError(last)\n            node[i] = value\n    else:\n        raise KeyError(last)\n```\n\nWait \u2014 for set_at on a list, replacing index: \"on a list replaces the index, or appends when the last token is '-'\". Does replacing an index past the end raise KeyError? \"Any other failure raises KeyError.\" Index past end is a failure \u2192 KeyError. Yes.\n\nHmm, but should set_at allow setting at index == len (like append via index)? Spec says appends only when token is '-'. So index == len \u2192 past the end \u2192 KeyError. Good.\n\nAlso for set_at, empty pointer: `_tokens('')` \u2014 ''.startswith('/') is False \u2192 KeyError. Good.\n\nOne more consideration: `_tokens` raising KeyError(pointer) \u2014 the exception arg. Fine.\n\nWhat about resolve where doc itself is a scalar and pointer is ''? Returns doc (the scalar). Fine \u2014 empty pointer names doc itself.\n\nWhat about resolve where pointer is '/' and doc is a list? Token '' \u2192 not digits \u2192 KeyError. Good.\n\nNow, the decode order: '~1' first then '~0'. Let me double check the spec: \"Inside a token '~1' stands for '/' and '~0' stands for '~', decoded in that order, so '~01' means the two characters '~1'.\" Yes: decode '~1' \u2192 '/' first, then '~0' \u2192 '~'. '~01': no '~1' substring... wait, '~01' \u2014 is there '~1'? Characters: index 0 '~', 1 '0', 2 '1'. Substring '~1' requires '~' immediately followed by '1'. '~' at 0 is followed by '0'. So no. Then '~0' \u2192 '~': '~01' \u2192 '~1'. Correct, two characters '~1'.\n\nBut careful with replace order in the other direction: if we did '~0' first: '~01' \u2192 '~1' \u2192 then '~1' \u2192 '/' \u2192 '/'. Wrong. So order matters and spec's order is '~1' then '~0'. My implementation: `token.replace('~1', '/').replace('~0', '~')`. Check '~1' \u2192 '/' \u2192 '/'. Check '~0' \u2192 '~0' (no change) \u2192 '~'. Check '~01' \u2192 '~01' \u2192 '~1'. Check '~~1' \u2192 '~' + '/'? '~~1' contains '~1' at position 1 \u2192 '~' '/' \u2192 then '~0'? No '~0' in '~/'. Result '~/'. Per RFC: '~~1' should decode to '~' + '/' = '~/'? RFC 6901: '~' is escaped as '~0', so '~~1' = '~0' '~1' \u2192 '~' '/'. Yes correct.\n\nNow also think about whether `_step` for dict with unhashable token \u2014 tokens are strings, always hashable. Fine.\n\nWhat about dict subclass or list subclass \u2014 isinstance handles.\n\nWhat about resolve stepping into a string: isinstance(node, dict) False, list False \u2192 KeyError. Good.\n\nNow the public tests: test_basic checks resolve('/a/b/1') == 20, resolve('/a~1b') == 1, set_at('/a/0', 9). All should pass.\n\nLet me also think about whether `resolve` should raise KeyError for pointer not starting with '/' \u2014 e.g., 'a'. Spec: \"Otherwise the pointer starts with '/'\" \u2014 implies non-empty pointer must start with '/'; a pointer like 'a' is malformed \u2192 KeyError (\"Any other failure raises KeyError\" is stated for set_at, but for resolve the failures listed are missing key, non-digit index, past end, step into scalar \u2014 a malformed pointer is also a failure; KeyError is the natural choice). I'll raise KeyError.\n\nHmm, one subtlety: should `_tokens` raise KeyError with the pointer as arg? Fine.\n\nAnother subtlety: for set_at, \"it resolves all but the last token the same way\" \u2014 same way means same error semantics including step into scalar \u2192 KeyError."
+  },
+  {
+   "role": "user",
+   "content": "Your reply hit the length cap before any tool call, so nothing happened. Keep prose short and make the tool call now."
+  },
+  {
+   "role": "assistant",
+   "content": "I need to make the tool call now. Write the fixed mod.py.</think>",
+   "tool_calls": [
+    {
+     "id": "call_d9mky4oq",
+     "function": {
+      "index": 0,
+      "name": "write_file",
+      "arguments": {
+       "path": "mod.py",
+       "content": "_DIGITS = set('0123456789')\n\n\ndef _decode(token):\n    # RFC 6901: '~1' -> '/' first, then '~0' -> '~'.\n    return token.replace('~1', '/').replace('~0', '~')\n\n\ndef _tokens(pointer):\n    if not pointer.startswith('/'):\n        raise KeyError(pointer)\n    return [_decode(t) for t in pointer[1:].split('/')]\n\n\ndef _as_index(token):\n    if not token or any(c not in _DIGITS for c in token):\n        raise KeyError(token)\n    return int(token)\n\n\ndef _step(node, token):\n    if isinstance(node, dict):\n        return node[token]\n    if isinstance(node, list):\n        i = _as_index(token)\n        if i >= len(node):\n            raise KeyError(token)\n        return node[i]\n    raise KeyError(token)\n\n\ndef resolve(doc, pointer):\n    if pointer == '':\n        return doc\n    node = doc\n    for token in _tokens(pointer):\n        node = _step(node, token)\n    return node\n\n\ndef set_at(doc, pointer, value):\n    tokens = _tokens(pointer)\n    node = doc\n    for token in tokens[:-1]:\n        node = _step(node, token)\n    last = tokens[-1]\n    if isinstance(node, dict):\n        node[last] = value\n    elif isinstance(node, list):\n        if last == '-':\n            node.append(value)\n        else:\n            i = _as_index(last)\n            if i >= len(node):\n                raise KeyError(last)\n            node[i] = value\n    else:\n        raise KeyError(last)"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "role": "tool",
+   "content": "wrote mod.py (1356 bytes)",
+   "tool_name": "write_file"
+  },
+  {
+   "role": "assistant",
+   "content": "",
+   "tool_calls": [
+    {
+     "id": "call_u9i9jy1f",
+     "function": {
+      "index": 0,
+      "name": "run_tests",
+      "arguments": {}
+     }
+    }
+   ]
+  },
+  {
+   "role": "tool",
+   "content": "PASS\n.\n----------------------------------------------------------------------\nRan 1 test in 0.001s\n\nOK",
+   "tool_name": "run_tests"
+  },
+  {
+   "role": "assistant",
+   "content": "Public tests pass. Now verify spec examples with run_python, including edge cases: '~01' decode, '/' key '', empty pointer, KeyError cases, set_at '-' append, set_at failures.</think>",
+   "tool_calls": [
+    {
+     "id": "call_2qannx1j",
+     "function": {
+      "index": 0,
+      "name": "run_python",
+      "arguments": {
+       "code": "from mod import resolve, set_at\nchecks = [\n    resolve({'a': {'b': [10, 20]}}, '/a/b/1') == 20,\n    resolve({'a/b': 1}, '/a~1b') == 1,\n    resolve({'~1': 5}, '/~01') == 5,\n    resolve({'': 3}, '/') == 3,\n    resolve([1, 2], '') == [1, 2],\n]\ndef k(f):\n    try:\n        f(); return False\n    except KeyError:\n        return True\n    except Exception:\n        return False\nchecks.append(k(lambda: resolve({'a': [1]}, '/a/1')))\nchecks.append(k(lambda: resolve({'a': 1}, '/a/x')))\nchecks.append(k(lambda: resolve({'a': 'str'}, '/a/0')))\nchecks.append(k(lambda: resolve({'a': [1]}, '/a/-')))\nchecks.append(k(lambda: resolve({'a': [1]}, '/a/01x')))\nchecks.append(k(lambda: resolve({'a': [1]}, 'a/0')))\nd = {'a': [1]}; set_at(d, '/a/-', 2); checks.append(d == {'a': [1, 2]})\nd = {'a': [1]}; set_at(d, '/a/0', 9); checks.append(d == {'a': [9]})\nd = {'a': {}}; set_at(d, '/a/b', 7); checks.append(d == {'a': {'b': 7}})\nchecks.append(set_at(d, '/a/b', 8) is None)\nchecks.append(k(lambda: set_at({'a': [1]}, '/a/1', 9)))\nchecks.append(k(lambda: set_at({'a': [1]}, '/a/x', 9)))\nchecks.append(k(lambda: set_at({'a': 1}, '/a/b', 9)))\nchecks.append(k(lambda: set_at({'a': 1}, '', 9)))\nchecks.append(k(lambda: set_at({'a': [1]}, '/a/-1', 9)))\nchecks.append(k(lambda: resolve({'a': [1]}, '')) is False or True)  # '' on resolve returns doc\nchecks.append(resolve({'a': [1]}, '') == {'a': [1]})\nchecks.append(resolve({'~0': 1}, '/~00') == 1)\nchecks.append(resolve({'~/': 1}, '/~0~1') == 1)\nprint(all(checks), checks)"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "role": "tool",
+   "content": "True [True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True]",
+   "tool_name": "run_python"
+  },
+  {
+   "role": "assistant",
+   "content": "All spec examples and edge cases pass, and public tests pass. Reply with one line describing what I changed.</think>Rewrote mod.py: empty pointer returns doc, pointers must start with '/', '~1' decoded before '~0', list steps require all-digit in-range indices, scalar steps and all set_at failures (bad index, past-end, '-', scalar parent) raise KeyError, and set_at appends on '-' \u2014 public tests pass."
+  }
+ ],
+ "final_sources": {
+  "mod.py": "_DIGITS = set('0123456789')\n\n\ndef _decode(token):\n    # RFC 6901: '~1' -> '/' first, then '~0' -> '~'.\n    return token.replace('~1', '/').replace('~0', '~')\n\n\ndef _tokens(pointer):\n    if not pointer.startswith('/'):\n        raise KeyError(pointer)\n    return [_decode(t) for t in pointer[1:].split('/')]\n\n\ndef _as_index(token):\n    if not token or any(c not in _DIGITS for c in token):\n        raise KeyError(token)\n    return int(token)\n\n\ndef _step(node, token):\n    if isinstance(node, dict):\n        return node[token]\n    if isinstance(node, list):\n        i = _as_index(token)\n        if i >= len(node):\n            raise KeyError(token)\n        return node[i]\n    raise KeyError(token)\n\n\ndef resolve(doc, pointer):\n    if pointer == '':\n        return doc\n    node = doc\n    for token in _tokens(pointer):\n        node = _step(node, token)\n    return node\n\n\ndef set_at(doc, pointer, value):\n    tokens = _tokens(pointer)\n    node = doc\n    for token in tokens[:-1]:\n        node = _step(node, token)\n    last = tokens[-1]\n    if isinstance(node, dict):\n        node[last] = value\n    elif isinstance(node, list):\n        if last == '-':\n            node.append(value)\n        else:\n            i = _as_index(last)\n            if i >= len(node):\n                raise KeyError(last)\n            node[i] = value\n    else:\n        raise KeyError(last)"
+ },
+ "grade": {
+  "public": {
+   "ok": true,
+   "ran": 1,
+   "passed": [
+    "test_basic"
+   ],
+   "failed": [],
+   "timed_out": false,
+   "text": ".\n----------------------------------------------------------------------\nRan 1 test in 0.002s\n\nOK"
+  },
+  "hidden": {
+   "ok": true,
+   "ran": 5,
+   "passed": [
+    "test_append",
+    "test_decode_order",
+    "test_errors_are_keyerror",
+    "test_root_and_empty_key",
+    "test_set_dict_and_list"
+   ],
+   "failed": [],
+   "timed_out": false,
+   "text": ".....\n----------------------------------------------------------------------\nRan 5 tests in 0.005s\n\nOK"
+  }
+ }
+}

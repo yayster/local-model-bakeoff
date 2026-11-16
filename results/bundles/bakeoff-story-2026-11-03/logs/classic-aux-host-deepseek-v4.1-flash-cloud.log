@@ -1,0 +1,113 @@
+speed1 0.0 tok/s
+speed2 0.0 tok/s
+speed3 0.0 tok/s
+SPEED_MEDIAN 0.0
+quiz books MISS last='**6**'
+quiz shop OK last='14'
+quiz discount MISS last='```'
+quiz thursday OK last='2027-03-18'
+quiz closure MISS last='```'
+quiz syllogism OK last='yes'
+quiz decoy OK last='2906'
+quiz tank60 MISS last='**60**'
+quiz tool OK {'name': 'date_diff', 'arguments': {'start': '2026-02-01', 'end': '2026-03-01'}}
+quiz code OK
+QUIZ 6/10
+ceil long-machine OK last='-37'
+ceil two-counter OK last='-7,-4'
+ceil ledger2 OK last='55'
+ceil impossible OK last='0'
+ceil both-days OK last='22'
+CEILING 5/5
+== chunks
+  turn 1 tools=['read_file', 'read_file', 'read_file'] 0.6s
+  turn 2 tools=['write_file'] 0.55s
+  turn 3 tools=['run_tests'] 0.37s
+chunks hidden turns 4 s 2.24
+== median
+  turn 1 tools=['read_file', 'read_file'] 0.44s
+  turn 2 tools=['write_file'] 0.59s
+  turn 3 tools=['run_tests'] 0.38s
+median hidden turns 4 s 2.22
+== second
+  turn 1 tools=['read_file', 'read_file', 'read_file'] 0.52s
+  turn 2 tools=['write_file'] 0.66s
+  turn 3 tools=['run_tests'] 0.4s
+second hidden turns 4 s 2.75
+== holiday
+  turn 1 tools=['read_file', 'read_file'] 0.47s
+  turn 2 tools=['write_file'] 0.62s
+  turn 3 tools=['run_tests'] 0.35s
+holiday hidden turns 4 s 2.18
+== duration
+  turn 1 tools=['read_file', 'read_file', 'read_file'] 0.51s
+  turn 2 tools=['write_file'] 0.62s
+  turn 3 tools=['run_tests'] 0.36s
+duration hidden turns 4 s 2.18
+== ledger
+  turn 1 tools=['read_file', 'read_file', 'read_file'] 0.57s
+  turn 2 tools=['write_file'] 0.57s
+  turn 3 tools=['run_tests'] 0.38s
+ledger hidden turns 4 s 2.36
+== discount
+  turn 1 tools=['read_file', 'read_file', 'read_file'] 0.58s
+  turn 2 tools=['write_file'] 0.59s
+  turn 3 tools=['run_tests'] 0.37s
+discount hidden turns 4 s 2.36
+== garage
+  turn 1 tools=['read_file', 'read_file', 'read_file'] 0.54s
+  turn 2 tools=['write_file'] 0.73s
+  turn 3 tools=['run_tests'] 0.47s
+garage hidden turns 4 s 2.71
+WROTE /home/user/local-model-bakeoff/repair/results/results-deepseek-v4.1-flash-cloud.json PASSED 8 / 8
+== L1 clamp
+  turn 1 tools=['read_file', 'read_file', 'read_file'] 0.55s
+  turn 2 tools=['write_file'] 0.46s
+  turn 3 tools=['run_tests'] 0.47s
+  turn 4 stop 0.57s
+clamp hidden turns 4 s 2.25
+== L2 csv
+  turn 1 tools=['read_file', 'read_file', 'read_file'] 0.48s
+  turn 2 tools=['write_file'] 0.78s
+  turn 3 tools=['run_tests'] 0.38s
+  turn 4 stop 0.64s
+csv hidden turns 4 s 2.47
+== L3 comment
+  turn 1 tools=['read_file', 'read_file', 'read_file'] 0.51s
+  turn 2 tools=['write_file'] 0.62s
+  turn 3 tools=['run_tests'] 0.37s
+  turn 4 stop 0.47s
+comment hidden turns 4 s 2.19
+== L4 rolling
+  turn 1 tools=['read_file', 'read_file', 'read_file'] 0.57s
+  turn 2 tools=['write_file'] 0.55s
+  turn 3 tools=['run_tests'] 0.37s
+  turn 4 stop 0.51s
+rolling hidden turns 4 s 2.2
+== L5 tax
+  turn 1 tools=['read_file', 'read_file', 'read_file', 'read_file'] 0.58s
+  turn 2 tools=['write_file'] 0.67s
+  turn 3 tools=['run_tests'] 0.42s
+  turn 4 tools=['run_tests'] 0.53s
+  turn 5 stop 1.23s
+tax hidden turns 5 s 3.71
+== L6 rooms
+  turn 1 tools=['read_file', 'read_file', 'read_file'] 0.48s
+  turn 2 tools=['write_file'] 0.49s
+  turn 3 tools=['run_tests'] 0.36s
+  turn 4 stop 0.44s
+rooms hidden turns 4 s 1.98
+== L7 transfer
+  turn 1 tools=['read_file', 'read_file', 'read_file'] 0.49s
+  turn 2 tools=['write_file'] 0.54s
+  turn 3 tools=['run_tests'] 0.38s
+  turn 4 stop 0.65s
+transfer hidden turns 4 s 2.28
+== L8 backoff
+  turn 1 tools=['read_file', 'read_file', 'read_file'] 0.56s
+  turn 2 tools=['write_file'] 0.52s
+  turn 3 tools=['run_tests'] 0.38s
+  turn 4 stop 0.55s
+backoff hidden turns 4 s 2.25
+WROTE /home/user/local-model-bakeoff/repair/results/results2-deepseek-v4.1-flash-cloud.json PASSED 8 / 8
+WROTE /home/user/local-model-bakeoff/results/deepseek-v4.1-flash-cloud.json

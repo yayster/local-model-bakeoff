@@ -1,0 +1,409 @@
+#### repeat 1/3
+== L1 pages (off-by-one, red public test)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.14s
+  turn 2 ['write_file'] 3.39s
+  turn 3 ['run_tests'] 0.76s
+  turn 4 stop 2.15s
+pages PASS cases 3/3 turns 4 stop=stop 10.8s tokens 216
+== L2 slug (edge cases of a one-liner)
+  turn 1 ['read_file', 'read_file', 'read_file'] 3.95s
+  turn 2 ['write_file'] 3.16s
+  turn 3 ['run_tests', 'run_python'] 4.7s
+  turn 4 stop 2.0s
+slug PASS cases 3/3 turns 4 stop=stop 14.1s tokens 300
+== L3 semver (parsing and ordering)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.05s
+  turn 2 ['write_file'] 10.41s
+  turn 3 ['run_tests'] 0.76s
+  turn 4 ['run_python'] 8.73s
+  turn 5 stop 2.49s
+semver PASS cases 3/3 turns 5 stop=stop 26.8s tokens 590
+== L4 intervals (algorithm invariants)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.05s
+  turn 2 ['write_file'] 6.9s
+  turn 3 ['run_tests', 'run_python'] 5.76s
+  turn 4 stop 3.14s
+intervals PASS cases 4/4 turns 4 stop=stop 20.2s tokens 437
+== L5 lru (stateful semantics)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.11s
+  turn 2 ['write_file'] 11.15s
+  turn 3 ['run_tests', 'run_python'] 6.9s
+  turn 4 stop 3.49s
+lru PASS cases 5/5 turns 4 stop=stop 26.0s tokens 568
+== L6 bucket (time and float accounting)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.06s
+  turn 2 ['write_file'] 8.67s
+  turn 3 ['run_tests'] 0.76s
+  turn 4 ['run_python'] 14.3s
+  turn 5 ['read_file'] 2.13s
+  turn 6 ['run_python'] 15.5s
+  turn 7 ['run_python'] 15.5s
+  turn 8 ['run_python'] 15.54s
+  turn 9 ['run_python'] 15.58s
+  turn 10 ['run_python'] 15.6s
+bucket PASS cases 5/5 turns 10 stop=turns 108.1s tokens 2470
+== L7 config (two files, type coercion)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.66s
+  turn 2 ['read_file'] 1.68s
+  turn 3 ['write_file'] 6.18s
+  turn 4 ['run_tests'] 0.76s
+  turn 5 ['run_python'] 10.55s
+  turn 6 stop 3.09s
+config PASS cases 6/6 turns 6 stop=stop 27.3s tokens 578
+== L8 toposort (graph algorithm, error type, determinism)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.17s
+  turn 2 ['write_file'] 13.3s
+  turn 3 ['run_tests'] 0.76s
+  turn 4 ['run_python'] 7.21s
+  turn 5 stop 3.16s
+toposort PASS cases 5/5 turns 5 stop=stop 28.9s tokens 638
+== L9 shlex (tokenizer state machine)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.14s
+  turn 2 ['write_file'] 15.67s
+  turn 3 ['run_tests', 'run_python'] 10.35s
+  turn 4 ['run_python'] 4.58s
+  turn 5 ['write_file'] 15.5s
+  turn 6 ['run_tests', 'run_python'] 9.75s
+  turn 7 ['run_python'] 3.86s
+  turn 8 ['write_file'] 15.98s
+  turn 9 ['run_tests', 'run_python'] 9.78s
+  turn 10 ['run_python'] 3.87s
+shlex MISS cases 5/6 turns 10 stop=turns 94.5s tokens 2133
+== L10 jsonptr (standard compliance)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.65s
+  turn 2 ['write_file'] 16.42s
+  turn 3 ['run_tests', 'run_python'] 18.86s
+  turn 4 stop 5.08s
+jsonptr PASS cases 5/5 turns 4 stop=stop 45.5s tokens 1009
+== L11 cron (two files, dense spec, two bugs)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.39s
+  turn 2 ['write_file', 'write_file'] 23.72s
+  turn 3 ['run_tests'] 0.78s
+  turn 4 ['run_python'] 16.82s
+  turn 5 ['write_file'] 17.06s
+  turn 6 ['run_python'] 16.85s
+  turn 7 ['run_tests'] 1.39s
+  turn 8 stop 4.32s
+cron PASS cases 5/5 turns 8 stop=stop 85.8s tokens 1944
+== L12 expr (recursive descent, precedence rules)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.43s
+  turn 2 ['run_python'] 10.2s
+  turn 3 ['write_file'] 28.8s
+  turn 4 ['run_python'] 19.24s
+  turn 5 ['run_python'] 19.34s
+  turn 6 ['read_file'] 1.32s
+  turn 7 ['run_python'] 3.56s
+  turn 8 ['run_python'] 2.97s
+  turn 9 ['run_python'] 1.85s
+  turn 10 ['run_python'] 2.11s
+  turn 11 ['run_python'] 1.75s
+  turn 12 ['run_python'] 1.74s
+expr MISS cases 1/5 turns 12 stop=turns 98.5s tokens 2185
+== L13 undo (nested state, history semantics)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.87s
+  turn 2 ['write_file'] 25.71s
+  turn 3 ['run_tests', 'run_python'] 25.89s
+  turn 4 ['write_file'] 25.41s
+  turn 5 ['run_tests', 'run_python'] 24.84s
+  turn 6 ['run_python'] 23.97s
+  turn 7 ['run_python'] 24.04s
+  turn 8 ['run_python'] 24.15s
+  turn 9 ['run_python'] 24.31s
+  turn 10 ['run_python'] 24.46s
+  turn 11 ['run_python'] 24.59s
+  turn 12 ['run_python'] 24.74s
+undo MISS cases 5/6 turns 12 stop=turns 278.6s tokens 6346
+== L14 reconcile (two files, greedy matching with tie-breaks)
+  turn 1 ['read_file', 'read_file', 'read_file'] 5.09s
+  turn 2 ['read_file'] 2.0s
+  turn 3 ['write_file', 'write_file'] 18.27s
+  turn 4 ['run_tests'] 0.78s
+  turn 5 ['run_python'] 14.77s
+  turn 6 stop 4.02s
+reconcile PASS cases 5/5 turns 6 stop=stop 45.3s tokens 980
+== L15 ranges (non-functional requirement, green tests)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.21s
+  turn 2 ['write_file'] 5.49s
+  turn 3 ['run_tests', 'run_python'] 8.96s
+  turn 4 stop 3.96s
+ranges PASS cases 3/3 turns 4 stop=stop 25.2s tokens 498
+== L16 allocate (spec above a wrong public test)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.04s
+  turn 2 ['write_file'] 5.85s
+  turn 3 ['run_tests'] 0.76s
+  turn 4 stop 5.88s
+allocate MISS cases 3/4 turns 4 stop=stop 16.8s tokens 357
+LADDER height 8/16 peak 15 passed 12/16 cases 66/73 gain 86% above the 23-case floor tokens 21249 secs 952.4
+#### repeat 2/3
+== L1 pages (off-by-one, red public test)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.03s
+  turn 2 ['write_file'] 3.39s
+  turn 3 ['run_tests'] 0.76s
+  turn 4 stop 2.15s
+pages PASS cases 3/3 turns 4 stop=stop 10.6s tokens 216
+== L2 slug (edge cases of a one-liner)
+  turn 1 ['read_file', 'read_file', 'read_file'] 3.95s
+  turn 2 ['write_file'] 3.16s
+  turn 3 ['run_tests', 'run_python'] 4.7s
+  turn 4 stop 2.0s
+slug PASS cases 3/3 turns 4 stop=stop 14.1s tokens 300
+== L3 semver (parsing and ordering)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.09s
+  turn 2 ['write_file'] 10.41s
+  turn 3 ['run_tests'] 0.76s
+  turn 4 ['run_python'] 8.72s
+  turn 5 stop 2.48s
+semver PASS cases 3/3 turns 5 stop=stop 26.8s tokens 590
+== L4 intervals (algorithm invariants)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.04s
+  turn 2 ['write_file'] 6.89s
+  turn 3 ['run_tests', 'run_python'] 5.75s
+  turn 4 stop 3.12s
+intervals PASS cases 4/4 turns 4 stop=stop 20.1s tokens 437
+== L5 lru (stateful semantics)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.12s
+  turn 2 ['write_file'] 11.12s
+  turn 3 ['run_tests', 'run_python'] 6.87s
+  turn 4 stop 3.49s
+lru PASS cases 5/5 turns 4 stop=stop 25.9s tokens 568
+== L6 bucket (time and float accounting)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.1s
+  turn 2 ['write_file'] 8.66s
+  turn 3 ['run_tests'] 0.76s
+  turn 4 ['run_python'] 14.28s
+  turn 5 ['read_file'] 2.13s
+  turn 6 ['run_python'] 15.5s
+  turn 7 ['run_python'] 15.51s
+  turn 8 ['run_python'] 15.59s
+  turn 9 ['run_python'] 15.58s
+  turn 10 ['run_python'] 15.62s
+bucket PASS cases 5/5 turns 10 stop=turns 108.3s tokens 2470
+== L7 config (two files, type coercion)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.66s
+  turn 2 ['read_file'] 1.69s
+  turn 3 ['write_file'] 6.18s
+  turn 4 ['run_tests'] 0.76s
+  turn 5 ['run_python'] 10.55s
+  turn 6 stop 3.09s
+config PASS cases 6/6 turns 6 stop=stop 27.2s tokens 578
+== L8 toposort (graph algorithm, error type, determinism)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.22s
+  turn 2 ['write_file'] 14.07s
+  turn 3 ['run_tests'] 0.76s
+  turn 4 ['run_python'] 7.22s
+  turn 5 stop 3.16s
+toposort PASS cases 5/5 turns 5 stop=stop 29.7s tokens 638
+== L9 shlex (tokenizer state machine)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.17s
+  turn 2 ['write_file'] 15.69s
+  turn 3 ['run_tests', 'run_python'] 9.7s
+  turn 4 ['run_python'] 4.47s
+  turn 5 ['write_file'] 15.5s
+  turn 6 ['run_tests', 'run_python'] 9.75s
+  turn 7 ['run_python'] 3.85s
+  turn 8 ['write_file'] 15.98s
+  turn 9 ['run_tests', 'run_python'] 9.78s
+  turn 10 ['run_python'] 3.88s
+shlex MISS cases 5/6 turns 10 stop=turns 93.8s tokens 2133
+== L10 jsonptr (standard compliance)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.64s
+  turn 2 ['write_file'] 16.41s
+  turn 3 ['run_tests', 'run_python'] 18.85s
+  turn 4 stop 5.11s
+jsonptr PASS cases 5/5 turns 4 stop=stop 45.5s tokens 1010
+== L11 cron (two files, dense spec, two bugs)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.37s
+  turn 2 ['write_file', 'write_file'] 23.7s
+  turn 3 ['run_tests'] 0.78s
+  turn 4 ['run_python'] 16.81s
+  turn 5 ['write_file'] 17.06s
+  turn 6 ['run_python'] 16.85s
+  turn 7 ['run_tests'] 1.39s
+  turn 8 stop 4.32s
+cron PASS cases 5/5 turns 8 stop=stop 85.7s tokens 1944
+== L12 expr (recursive descent, precedence rules)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.44s
+  turn 2 ['run_python'] 10.2s
+  turn 3 ['write_file'] 28.8s
+  turn 4 ['run_python'] 19.25s
+  turn 5 ['run_python'] 19.37s
+  turn 6 ['run_python'] 3.16s
+  turn 7 ['read_file'] 1.3s
+  turn 8 ['run_python'] 2.71s
+  turn 9 ['run_python'] 1.87s
+  turn 10 ['run_python'] 2.42s
+  turn 11 ['run_python'] 1.68s
+  turn 12 ['run_python'] 1.74s
+expr MISS cases 1/5 turns 12 stop=turns 98.2s tokens 2175
+== L13 undo (nested state, history semantics)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.85s
+  turn 2 ['write_file'] 25.72s
+  turn 3 ['run_tests', 'run_python'] 25.9s
+  turn 4 ['write_file'] 25.43s
+  turn 5 ['run_tests', 'run_python'] 24.85s
+  turn 6 ['run_python'] 23.98s
+  turn 7 ['run_python'] 24.02s
+  turn 8 ['run_python'] 24.16s
+  turn 9 ['run_python'] 24.3s
+  turn 10 ['run_python'] 24.43s
+  turn 11 ['run_python'] 24.56s
+  turn 12 ['run_python'] 24.72s
+undo MISS cases 5/6 turns 12 stop=turns 278.9s tokens 6346
+== L14 reconcile (two files, greedy matching with tie-breaks)
+  turn 1 ['read_file', 'read_file', 'read_file'] 5.09s
+  turn 2 ['read_file'] 2.0s
+  turn 3 ['write_file', 'write_file'] 18.27s
+  turn 4 ['run_tests'] 0.78s
+  turn 5 ['run_python'] 14.8s
+  turn 6 stop 4.02s
+reconcile PASS cases 5/5 turns 6 stop=stop 45.4s tokens 980
+== L15 ranges (non-functional requirement, green tests)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.21s
+  turn 2 ['write_file'] 5.5s
+  turn 3 ['run_tests', 'run_python'] 8.97s
+  turn 4 stop 3.96s
+ranges PASS cases 3/3 turns 4 stop=stop 25.3s tokens 498
+== L16 allocate (spec above a wrong public test)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.05s
+  turn 2 ['write_file'] 5.85s
+  turn 3 ['run_tests'] 0.76s
+  turn 4 stop 5.89s
+allocate MISS cases 3/4 turns 4 stop=stop 16.9s tokens 357
+LADDER height 8/16 peak 15 passed 12/16 cases 66/73 gain 86% above the 23-case floor tokens 21240 secs 952.4
+#### repeat 3/3
+== L1 pages (off-by-one, red public test)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.03s
+  turn 2 ['write_file'] 3.39s
+  turn 3 ['run_tests'] 0.76s
+  turn 4 stop 2.15s
+pages PASS cases 3/3 turns 4 stop=stop 10.7s tokens 216
+== L2 slug (edge cases of a one-liner)
+  turn 1 ['read_file', 'read_file', 'read_file'] 3.95s
+  turn 2 ['write_file'] 3.17s
+  turn 3 ['run_tests', 'run_python'] 4.7s
+  turn 4 stop 2.0s
+slug PASS cases 3/3 turns 4 stop=stop 14.2s tokens 300
+== L3 semver (parsing and ordering)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.08s
+  turn 2 ['write_file'] 10.42s
+  turn 3 ['run_tests'] 0.76s
+  turn 4 ['run_python'] 8.73s
+  turn 5 stop 2.49s
+semver PASS cases 3/3 turns 5 stop=stop 27.0s tokens 590
+== L4 intervals (algorithm invariants)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.04s
+  turn 2 ['write_file'] 6.89s
+  turn 3 ['run_tests', 'run_python'] 5.76s
+  turn 4 stop 3.12s
+intervals PASS cases 4/4 turns 4 stop=stop 20.2s tokens 437
+== L5 lru (stateful semantics)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.12s
+  turn 2 ['write_file'] 11.11s
+  turn 3 ['run_tests', 'run_python'] 6.87s
+  turn 4 stop 3.49s
+lru PASS cases 5/5 turns 4 stop=stop 26.0s tokens 568
+== L6 bucket (time and float accounting)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.1s
+  turn 2 ['write_file'] 8.66s
+  turn 3 ['run_tests'] 0.76s
+  turn 4 ['run_python'] 14.3s
+  turn 5 ['read_file'] 2.13s
+  turn 6 ['run_python'] 15.5s
+  turn 7 ['run_python'] 15.53s
+  turn 8 ['run_python'] 15.55s
+  turn 9 ['run_python'] 16.3s
+  turn 10 ['run_python'] 15.61s
+bucket PASS cases 5/5 turns 10 stop=turns 108.9s tokens 2470
+== L7 config (two files, type coercion)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.66s
+  turn 2 ['read_file'] 1.68s
+  turn 3 ['write_file'] 6.18s
+  turn 4 ['run_tests'] 0.77s
+  turn 5 ['run_python'] 10.55s
+  turn 6 stop 3.09s
+config PASS cases 6/6 turns 6 stop=stop 27.3s tokens 578
+== L8 toposort (graph algorithm, error type, determinism)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.17s
+  turn 2 ['write_file'] 13.3s
+  turn 3 ['run_tests'] 0.76s
+  turn 4 ['run_python'] 7.22s
+  turn 5 stop 3.16s
+toposort PASS cases 5/5 turns 5 stop=stop 29.1s tokens 638
+== L9 shlex (tokenizer state machine)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.16s
+  turn 2 ['write_file'] 15.67s
+  turn 3 ['run_tests', 'run_python'] 9.7s
+  turn 4 ['run_python'] 4.47s
+  turn 5 ['write_file'] 15.5s
+  turn 6 ['run_tests', 'run_python'] 9.75s
+  turn 7 ['run_python'] 3.86s
+  turn 8 ['write_file'] 15.98s
+  turn 9 ['run_tests', 'run_python'] 9.8s
+  turn 10 ['run_python'] 3.89s
+shlex MISS cases 5/6 turns 10 stop=turns 93.8s tokens 2133
+== L10 jsonptr (standard compliance)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.64s
+  turn 2 ['write_file'] 16.42s
+  turn 3 ['run_tests', 'run_python'] 18.86s
+  turn 4 stop 5.07s
+jsonptr PASS cases 5/5 turns 4 stop=stop 45.5s tokens 1009
+== L11 cron (two files, dense spec, two bugs)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.38s
+  turn 2 ['write_file', 'write_file'] 23.72s
+  turn 3 ['run_tests'] 0.78s
+  turn 4 ['run_python'] 16.8s
+  turn 5 ['write_file'] 17.04s
+  turn 6 ['run_python'] 16.84s
+  turn 7 ['run_tests'] 1.39s
+  turn 8 stop 4.32s
+cron PASS cases 5/5 turns 8 stop=stop 85.8s tokens 1944
+== L12 expr (recursive descent, precedence rules)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.44s
+  turn 2 ['run_python'] 10.2s
+  turn 3 ['write_file'] 28.8s
+  turn 4 ['run_python'] 19.23s
+  turn 5 ['run_python'] 19.34s
+  turn 6 ['read_file'] 1.32s
+  turn 7 ['run_python'] 3.56s
+  turn 8 ['run_python'] 2.96s
+  turn 9 ['run_python'] 1.85s
+  turn 10 ['run_python'] 2.11s
+  turn 11 ['run_python'] 1.74s
+  turn 12 ['run_python'] 1.73s
+expr MISS cases 1/5 turns 12 stop=turns 98.5s tokens 2185
+== L13 undo (nested state, history semantics)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.85s
+  turn 2 ['write_file'] 25.72s
+  turn 3 ['run_tests', 'run_python'] 25.89s
+  turn 4 ['write_file'] 25.42s
+  turn 5 ['run_tests', 'run_python'] 24.88s
+  turn 6 ['run_python'] 5.0s
+  turn 7 ['run_python'] 24.61s
+  turn 8 ['run_python'] 24.7s
+  turn 9 ['run_python'] 24.83s
+  turn 10 ['run_python'] 24.98s
+  turn 11 ['run_python'] 25.13s
+  turn 12 ['run_python'] 25.3s
+undo MISS cases 5/6 turns 12 stop=turns 262.9s tokens 5992
+== L14 reconcile (two files, greedy matching with tie-breaks)
+  turn 1 ['read_file', 'read_file', 'read_file'] 5.08s
+  turn 2 ['read_file'] 2.0s
+  turn 3 ['write_file', 'write_file'] 18.25s
+  turn 4 ['run_tests'] 0.78s
+  turn 5 ['run_python'] 14.77s
+  turn 6 stop 4.02s
+reconcile PASS cases 5/5 turns 6 stop=stop 45.3s tokens 980
+== L15 ranges (non-functional requirement, green tests)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.22s
+  turn 2 ['write_file'] 5.49s
+  turn 3 ['run_tests', 'run_python'] 8.96s
+  turn 4 stop 3.58s
+ranges PASS cases 3/3 turns 4 stop=stop 24.8s tokens 489
+== L16 allocate (spec above a wrong public test)
+  turn 1 ['read_file', 'read_file', 'read_file'] 4.05s
+  turn 2 ['write_file'] 5.84s
+  turn 3 ['run_tests'] 0.76s
+  turn 4 stop 5.89s
+allocate MISS cases 3/4 turns 4 stop=stop 16.8s tokens 357
+LADDER height 8/16 peak 15 passed 12/16 cases 66/73 gain 86% above the 23-case floor tokens 20886 secs 936.8
+WROTE /home/user/local-model-bakeoff/results/ladder/qwen3.8-27b.json
